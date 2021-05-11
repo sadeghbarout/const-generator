@@ -4,7 +4,7 @@
 
 2- copy this code in  **config/app** under **providers**
 
-		Colbeh\Consts\ConstsServiceProvider::class,
+		Colbeh\Consts\ServiceProvider::class,
 
 3- go to 
 

@@ -2,10 +2,8 @@
 
 namespace Colbeh\Consts;
 
-use Illuminate\Support\ServiceProvider;
 
-
-class ConstsServiceProvider extends \Illuminate\Support\ServiceProvider {
+class ServiceProvider extends \Illuminate\Support\ServiceProvider {
 	/**
 	 * Bootstrap the application services.
 	 *

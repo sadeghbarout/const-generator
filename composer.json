@@ -1,12 +1,31 @@
 {
-    "name": "colbeh/consts",
-    "description": "create DB consts",
-    "authors": [
+    "name":"colbeh/consts",
+    "description":"laravel tables constant generator",
+    "type":"laravel-package",
+    "keywords":[
+        "laravel",
+        "migration",
+        "database"
+    ],
+    "license":"MIT",
+    "authors":[
         {
-            "name": "sadegh",
-            "email": "sbarotcob@gmail.com"
+            "name":"Colbeh software team",
+            "email":"support@colbeh.ir"
         }
     ],
-    "minimum-stability": "stable",
-    "require": {}
+    "require":{
+    },
+    "autoload":{
+        "psr-4":{
+            "Colbeh\\Consts\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Colbeh\\Consts\\ServiceProvider"
+            ]
+        }
+    }
 }
