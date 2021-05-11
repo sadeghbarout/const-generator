@@ -1,0 +1,12 @@
+{
+    "name": "Colbeh/consts",
+    "description": "create DB consts",
+    "authors": [
+        {
+            "name": "sadegh",
+            "email": "sbarotcob@gmail.com"
+        }
+    ],
+    "minimum-stability": "stable",
+    "require": {}
+}
