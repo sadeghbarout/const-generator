@@ -1,4 +1,4 @@
-**usage steps:**
+**Installation:**
 
 1- composer require colbeh/consts
 
@@ -19,3 +19,5 @@
 3- go to 
 
         domain.com/const
+        
+4- add tables        
