@@ -2,9 +2,19 @@
 
 1- composer require colbeh/consts
 
-2- copy this code in  **config/app** under **providers**
+2- make sure you have app/Extras/consts.php and added to composer.json
 
-		Colbeh\Consts\ServiceProvider::class,
+        ...
+        
+        "autoload": {
+                "files":[
+                    ...
+                    "app/Extras/consts.php"
+                    ...
+                ]
+            },
+            
+        ...
 
 3- go to 
 
