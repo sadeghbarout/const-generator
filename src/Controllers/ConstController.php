@@ -16,9 +16,22 @@ class ConstController {
 
         $tables = [];
         $tablesIn = 'Tables_in_'.$dbName;
-        foreach($tablesRaw as $table){
-            $tables[] = $table -> $tablesIn;
-        }
+		foreach($tablesRaw as $table){
+
+			$tableName = $table -> $tablesIn;
+
+			$tableColumns = DB::select("SHOW COLUMNS FROM ". $tableName);
+
+			$tables[$tableName]['table_name'] = $tableName;
+
+			foreach($tableColumns as &$tc){
+				$tc = $this->convertDatabaseColumnTypeToOurStandard($tc);
+			}
+
+			$tables[$tableName]['cols'] = $tableColumns;
+		}
+		$tables = json_encode($tables);
+
 		return view("const::index", compact('tables'));
     }
 
@@ -69,7 +82,7 @@ class ConstController {
 
 			list($hasScope,$col)=$this->checkHasScope($col);
 
-			list($colType,$col)=$this->getType($col);
+			list($colType,$col,$enumsArray)=$this->getType($col);
 
 			$colName='COL_'.strtoupper($colPrefix).'_'.strtoupper($col); // first_name => COL_USER_FIRST_NAME
 			$ucaseCol=str_replace('_', '', ucwords($col, '_')); // first_name =>FistName
@@ -77,8 +90,8 @@ class ConstController {
 
 			$colNames[$col] = $colName;
 			$constData.="define('$colName', '".strtolower($col)."');\n";
-			$factoryData .= $this -> generateFactoryRow($colType,$colName);
-			$migrateData .= $this -> generateMigrationRow($colType,$colPrefix, $colName,$col);
+			$factoryData .= $this -> generateFactoryRow($colType,$colName,$enumsArray);
+			$migrateData .= $this -> generateMigrationRow($colType,$colPrefix, $colName,$col,$enumsArray);
 
 			if($hasScope){
 				$scopeHintData .= $this -> generateScopeHintRow($modalName, $camelcaseCol);
@@ -108,6 +121,7 @@ class ConstController {
 
 	private function getType($col) {
 		$colType="";
+		$enumsArray=null;
 		if($col == "id")
 			$colType="id";
 
@@ -115,6 +129,11 @@ class ConstController {
 			$colType = substr($col, strpos($col, "=") + 1);
 			$colType=$colType=='int'?'integer':$colType;
 			$colType=$colType=='str'?'string':$colType;
+
+			if(strpos($colType,"enum") !== false) {
+				$currentType = \str_replace("enum:", "", $colType);
+				$enumsArray = explode(",", $currentType);
+			}
 
 			if($colType == "")
 				dd("Error : Enter ".$col." Type");
@@ -125,11 +144,11 @@ class ConstController {
 			dd("Error : Enter ".$col." Type");
 		}
 
-		return [$colType,$col];
+		return [$colType,$col,$enumsArray];
     }
 
 	// ---------------------------------------------------------------------------------------------
-	public function generateFactoryRow($colType,$colName){
+	public function generateFactoryRow($colType,$colName,$data=null){
 		if($colType == 'string'){
 			$value = '$this->faker->name';
 		}
@@ -157,7 +176,7 @@ class ConstController {
 		elseif($colType == 'username'){
 			$value = '$this->faker->userName';
 		}
-		elseif($colType == 'datetime'){
+		elseif($colType == 'datetime' || $colType == 'timestamp'){
 			$value = 'getServerDateTime()';
 		}
 		elseif($colType == 'password'){
@@ -170,9 +189,8 @@ class ConstController {
 			$value = 'mt_rand(0,1)';
 		}
 		elseif(strpos($colType,'enum') !== false){
-			$colType = str_replace("enum:","",$colType);
-			$enums = explode(',',$colType);
-			$value = "rand(1,".sizeof($enums).")";
+			$value = "rand(1,".sizeof($data).")";
+
 		}
 
 		if(isset($value)){
@@ -184,7 +202,7 @@ class ConstController {
 
 
 	// ---------------------------------------------------------------------------------------------
-	public function generateMigrationRow($colType, $colPrefix, $colName, $col){
+	public function generateMigrationRow($colType,$colPrefix,$colName,$col,$data=null, $editConstFile = true){
 
 		if($colType == 'id'){
 			$value ='increments('.$colName.');';
@@ -219,7 +237,7 @@ class ConstController {
 		elseif($colType == 'username'){
 			$value = 'string('.$colName.',150);';
 		}
-		elseif($colType == 'datetime'){
+		elseif($colType == 'datetime' || $colType == 'timestamp'){
 			$value = 'datetime('.$colName.') -> nullable();';
 		}elseif($colType == 'time'){
 			$value = 'time('.$colName.') -> nullable();';
@@ -229,9 +247,7 @@ class ConstController {
 			$value = 'boolean('.$colName.') ->default(false);';
 		}
 		elseif(strpos($colType,'enum') !== false){
-			$colType = str_replace("enum:","",$colType);
-			$enums = explode(',',$colType);
-			$enumConsts = $this -> enumConstGenerator($enums,$colPrefix,$col);
+			$enumConsts = $this -> enumConstGenerator($data,$colPrefix,$col, $editConstFile);
 			$value = 'enum('.$colName.',['.$enumConsts.']);';
 		}
 
@@ -244,7 +260,7 @@ class ConstController {
 
 
 	// ---------------------------------------------------------------------------------------------
-	public function enumConstGenerator($enums,$colPrefix,$col){
+	public function enumConstGenerator($enums,$colPrefix,$col, $editConstFile){
 		$data1= "";
 		$enumConsts = [];
 		foreach($enums as $enum){
@@ -253,11 +269,17 @@ class ConstController {
 			$data1.="define('$enumName', '".strtolower($enum)."');\n";
 		}
 		$data1.="\n\n\n";
-		$this->writeConsts($data1,'enum');
+
+		if($editConstFile){
+			$this->writeConsts($data1,'enum');
+
+		}
+
 		$enumConsts = implode(',',$enumConsts);
 
 		return $enumConsts;
 	}
+
 	// ---------------------------------------------------------------------------------------------
 	private function generateScopeHintRow($modalName, $camelcaseCol) {
 		return ' * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\\' . $modalName . ' ' . $camelcaseCol . '($value)
@@ -316,7 +338,7 @@ class ConstController {
 		$modelFileContent=file_get_contents($modelPath);
 		$modelFileContent=str_replace('use HasFactory;',$scopeData,$modelFileContent);
 		$modelFileContent=substr_replace($modelFileContent,$scopeHintData,125,0);
-		$modelFileContent=substr_replace($modelFileContent,'use App\ModelEnhanced;',29,0);
+		$modelFileContent=substr_replace($modelFileContent,'use App\Models\ModelEnhanced;',29,0);
 
 		$ModelPos=strpos($modelFileContent,'Model',strpos($modelFileContent,'extends'));
 		$modelFileContent=substr_replace($modelFileContent,'ModelEnhanced',$ModelPos,5);
@@ -440,104 +462,83 @@ class ConstController {
 
 
     // -------------------------------------------------------------------------------------------------------------
-    public function columnAdd(){
-        $table = request('table');
-        $cols = request('cols');
-        $data = '';
 
-
-        $tableName="TBL_".strtoupper($table);
-
-
-        $constsPath='../app/Extras/consts2.php';
-        $constsFileContent=file_get_contents($constsPath);
-        $pos=0;
-
-        $pos=strpos($constsFileContent, "define('".$tableName."', '".$table."')");
-        $pos=strpos($constsFileContent, "\n",$pos);
-
-
-        $colSample = \substr($constsFileContent, $pos+1, strpos($constsFileContent, "\n",$pos+1) - $pos);
-
-        // extracting the column name and make it upper case : id => ID
-        $colSampleName = substr($colSample, strpos($colSample, ","));
-        $colSampleName = \str_replace(',','',$colSampleName);
-        $colSampleName = \str_replace("'",'',$colSampleName);
-        $colSampleName = \str_replace(")",'',$colSampleName);
-        $colSampleName = \str_replace("\n",'',$colSampleName);
-        $colSampleName = \str_replace(";",'',$colSampleName);
-        $colSampleName = strtoupper($colSampleName);
-        $colSampleName = trim($colSampleName);
-
-
-        // extracting something like this : COL_BANK_ID    and turn it to : COL_BANK_   as the prefix
-        $colSamplePrefix = substr($colSample, strpos($colSample, "("),  strpos($colSample, ",") - strpos($colSample, "("));
-        $colSamplePrefix = \str_replace('(','',$colSamplePrefix);
-        $colSamplePrefix = \str_replace("'",'',$colSamplePrefix);
-        $colSamplePrefix = \str_replace("'",'',$colSamplePrefix);
-        $colSamplePrefix = substr($colSamplePrefix,0, strpos($colSamplePrefix,$colSampleName));
-        $colSamplePrefix = \str_replace('COL_','',$colSamplePrefix);
-        $colSamplePrefix = \str_replace('_','',$colSamplePrefix);
+	// ----------------------------------------------------------------------------------------------------------------------------------------------
+	// ----------------------------------------------------------------------------------------------------------------------------------------------
+	// ----------------------------------------------------------------------------------------------------------------------------------------------
+	// ----------------------------------------------------------------------------------------------------------------------------------------------
+	// ----------------------------------------------------------------------------------------------------------------------------------------------
+	// ----------------------------------------------------------------------------------------------------------------------------------------------
+	// ----------------------------------------------------------------------------------------------------------------------------------------------
+	// ----------------------------------------------------------------------------------------------------------------------------------------------
 
 
 
-
-        $model = Str::studly(Str::singular($table));
-        $modelDirectory = 'App\Models\\' . $model;
-        if(!class_exists($modelDirectory)) {
-            dd('Model not found'); // TODO
-        }
+	public function columnAdd(){
+		$table = request('table');
+		$cols = request('cols');
+		$data = '';
 
 
-        // creating the new column constant : COL_BANK_NEW
-        list($data,$tableName,$migrateData,$scopeData,$scopeHintData,$factoryData, $colNames) = $this->colsDataCreation($cols,$colSamplePrefix, $table, $model);
-        $data = trim($data);
-        $constsFileContent=substr($constsFileContent,0,$pos+1).$data."\n".substr($constsFileContent,$pos+1);
+		$tableName="TBL_".strtoupper($table);
+
+
+		$constsPath='../app/Extras/consts.php';
+		$constsFileContent=file_get_contents($constsPath);
+		$pos=0;
+
+		$pos=strpos($constsFileContent, "define('".$tableName."', '".$table."')");
+		$pos=strpos($constsFileContent, "\n",$pos);
+
+
+		$colSample = \substr($constsFileContent, $pos+1, strpos($constsFileContent, "\n",$pos+1) - $pos);
+
+		// extracting the column name and make it upper case : id => ID
+		$colSampleName = substr($colSample, strpos($colSample, ","));
+		$colSampleName = \str_replace(',','',$colSampleName);
+		$colSampleName = \str_replace("'",'',$colSampleName);
+		$colSampleName = \str_replace(")",'',$colSampleName);
+		$colSampleName = \str_replace("\n",'',$colSampleName);
+		$colSampleName = \str_replace(";",'',$colSampleName);
+		$colSampleName = strtoupper($colSampleName);
+		$colSampleName = trim($colSampleName);
+
+
+		// extracting something like this : COL_BANK_ID    and turn it to : COL_BANK_   as the prefix
+		$colSamplePrefix = substr($colSample, strpos($colSample, "("),  strpos($colSample, ",") - strpos($colSample, "("));
+		$colSamplePrefix = \str_replace('(','',$colSamplePrefix);
+		$colSamplePrefix = \str_replace("'",'',$colSamplePrefix);
+		$colSamplePrefix = \str_replace("'",'',$colSamplePrefix);
+		$colSamplePrefix = substr($colSamplePrefix,0, strpos($colSamplePrefix,$colSampleName));
+		$colSamplePrefix = \str_replace('COL_','',$colSamplePrefix);
+		$colSamplePrefix = \str_replace('_','',$colSamplePrefix);
 
 
 
 
-        // finding migration file
-        $migFile = DB::table('migrations')->where('migration','LIKE',"%$table%")->first();
-        if($migFile == null)
-            dd('ERROR : migration file not found in the database migration table');
-
-        $migFilePath='../database/migrations/'.$migFile->migration.'.php';
-        $migFileContent = file_get_contents($migFilePath);
-
-
-        $tPos1 = strpos($migFileContent,'$table', strpos($migFileContent, '$table') + 1); // TODO : find last $table
-        $tPos2 = strpos($migFileContent,"\n",$tPos1);
-        $migFileContent=substr($migFileContent,0,$tPos2+1).$migrateData."\n".substr($migFileContent,$tPos2+1);
+		$model = Str::studly(Str::singular($table));
+		$modelDirectory = 'App\Models\\' . $model;
+		if(!class_exists($modelDirectory)) {
+			dd('Model not found'); // TODO
+		}
 
 
 
-        // factory
-        $factoryPath='../database/factories/'.$model.'Factory.php';
-        $factoryFileContent=file_get_contents($factoryPath);
-        $facPos1 = strpos($factoryFileContent, "]");
-        $factoryFileContent=substr($factoryFileContent,0,$facPos1-1).$factoryData."\n".substr($factoryFileContent,$facPos1-1);
-        $factoryFileContent = trim($factoryFileContent);
+		list($newCols, $removedCols, $modifiedCols) = $this->getColumnsModifications($cols, $table);
+
+		if(sizeof($removedCols) > 0)
+			dd("NOT ALLOWED TO REMOVE COLS");
+
+
+		$this->addNewColumn($newCols,$colSamplePrefix, $table, $model,$constsFileContent,$pos,$constsPath);
+
+		$this->modifyColumn($modifiedCols,$table,$colSamplePrefix,$model);
 
 
 
-        // model
-        if($scopeData != ""){
-            // TODO
-        }
+		dd('asd');
 
-
-
-
-
-        // file_put_contents($constsPath,$constsFileContent);
-        // file_put_contents($migFilePath,$migFileContent);
-        // file_put_contents($factoryPath,$factoryFileContent);
-
-        // DB::statement('ALTER TABLE '.$table.' ADD new1 int');
-        dd('asd');
-
-    }
+	}
 
 
 
@@ -548,17 +549,176 @@ class ConstController {
 
 
 
-    // ---------------------------------------------------------------------------------------
-    public function colsDataCreation($cols,$colPrefix,$tableName,$modalName){
-        $cols=explode("\r\n",$cols);
-        $data = '';
-        $migrateData = '';
-        $scopeHintData = '';
-        $scopeData = '';
-        $factoryData  = '';
 
 
-        foreach ($cols AS $col){
+
+
+
+
+	// ==============================================================================================
+	public function getColumnsModifications($cols, $table){
+		$enteredColsAsArray =explode("\r\n",$cols);
+		$selectedTableExistingColumns = DB::select("SHOW COLUMNS FROM ". $table);
+		$newCols = [];
+		$removedCols = [];
+		$modifiedCols = [];
+
+
+		foreach($enteredColsAsArray as $enteredCol){
+
+			$enteredColName = explode("=",$enteredCol)[0];
+
+			$enteredColExisits = false;
+
+			foreach($selectedTableExistingColumns as $existingColumn){
+				if($existingColumn -> Field == $enteredColName)
+					$enteredColExisits = true;
+			}
+
+			if(!$enteredColExisits)
+				$newCols[] = $enteredCol;
+		}
+
+
+		foreach($selectedTableExistingColumns as $existingColumn){
+
+			$colStillExists = false;
+
+			foreach($enteredColsAsArray as $enteredCol){
+
+				$enteredColName = explode("=",$enteredCol)[0];
+
+				if($existingColumn -> Field == $enteredColName){
+					$colStillExists = true;
+
+
+					$modifiedCol = $this->checkIfEnteredExsitingColDiffersFromTheOneInDatabase($existingColumn,$enteredCol);
+
+					if(sizeof($modifiedCol) > 0)
+						$modifiedCols[] = $modifiedCol;
+				}
+			}
+
+			if(!$colStillExists)
+				$removedCols[] = $existingColumn->Field;
+		}
+
+		return [$newCols, $removedCols, $modifiedCols];
+	}
+
+
+
+	// -----------------------------------------------------------------------------------------------------
+	public function convertDatabaseColumnTypeToOurStandard($col){
+		// Field is the name of column , Type is the type of column
+
+		$colType = $col -> Type;
+
+		if(\strpos($colType,"int(") !== false)
+			$colType = 'integer';
+		elseif(\strpos($colType,"varchar") !== false)
+			$colType = 'string';
+		elseif(\strpos($colType,"timestamp") !== false)
+			$colType = 'datetime';
+		elseif(\strpos($colType,"enum") !== false){
+
+			$colType = \str_replace("enum","",$colType);
+			$colType = \str_replace("(","",$colType);
+			$colType = \str_replace(")","",$colType);
+			$colType = \str_replace("'","",$colType);
+			$enums = explode(",",$colType);
+
+			$colType = 'enum:';
+			foreach($enums as $index =>$enum){
+
+				if($index+1 < sizeof($enums))
+					$colType .= $enum.',';
+				else
+					$colType .= $enum;
+			}
+		}
+
+		$col -> Type = $colType;
+
+		return $col;
+	}
+
+
+	// -------------------------------------------------------------------------------------------------------
+	// this function checks for modification in existing columns , not removed or new columns
+	public function checkIfEnteredExsitingColDiffersFromTheOneInDatabase($existingColumn,$enteredCol){
+
+		$modifiedCols = [];
+
+		$enteredType = substr($enteredCol, strpos($enteredCol, "=") + 1);
+		$enteredType = trim($enteredType);
+		$enteredType = $enteredType=='int'?'integer':$enteredType;
+		$enteredType = $enteredType=='str'?'string':$enteredType;
+
+		$existingColumn = $this->convertDatabaseColumnTypeToOurStandard($existingColumn);
+		$currentType = $existingColumn -> Type;
+		$colName = $existingColumn -> Field;
+
+
+		if(strpos($enteredType,"enum") === false){ // not enum
+
+			if($currentType != $enteredType){
+				$modifiedCols['is_enum'] = 0;
+				$modifiedCols['name'] = $colName;
+				$modifiedCols['old_type'] = $currentType;
+				$modifiedCols['new_type'] = $enteredType;
+				$modifiedCols['enums'] = null;
+			}
+
+		}
+		elseif(strpos($enteredType,"enum") !== false){
+
+			$currentType = \str_replace("enum","",$currentType);
+			$currentType = \str_replace(":","",$currentType);
+
+			$currentEnumsArray = explode(",",$currentType);
+
+			$enteredType = \str_replace("enum","",$enteredType);
+			$enteredType = \str_replace(":","",$enteredType);
+
+			$enteredEnumsArray = explode(",",$enteredType);
+
+
+			$modifiedCols['name'] = $colName;
+			$modifiedCols['is_enum'] = 1;
+			$modifiedCols['enums'] = $enteredEnumsArray;
+			$modifiedCols['new_type'] = 'enum';
+			$modifiedCols['old_enums'] = $currentEnumsArray;
+			$modifiedCols['removed_enums'] = array_diff($currentEnumsArray, $enteredEnumsArray);
+			$modifiedCols['added_enums'] = array_diff($enteredEnumsArray, $currentEnumsArray);
+
+
+		}
+
+		return $modifiedCols;
+	}
+
+
+
+
+
+
+
+
+	// ---------------------------------------------------------------------------------------
+	public function colsDataCreation($cols,$colPrefix,$tableName,$modalName){
+
+		if(!\is_array($cols))
+			$cols=explode("\r\n",$cols);
+
+		$data = '';
+		$migrateData = '';
+		$scopeHintData = '';
+		$scopeData = '';
+		$factoryData  = '';
+
+
+		foreach ($cols AS $col){
 
 			$hasScope=false;
 			if(strpos($col,'*')){
@@ -568,37 +728,55 @@ class ConstController {
 			}
 
 			if(strpos($col,'=')){
-                $colType = substr($col, strpos($col, "=") + 1);
-                $colType = trim($colType);
+				$colType = substr($col, strpos($col, "=") + 1);
+				$colType = trim($colType);
 				$colType=$colType=='int'?'integer':$colType;
 				$colType=$colType=='str'?'string':$colType;
-                $col = substr($col, 0, strpos($col, "="));
+				$col = substr($col, 0, strpos($col, "="));
 
-                if($colType == "")
-                    dd("Error : Enter ".$col." Type");
-            }
-            else{
-                if($col != "id")
-                    dd("Error : Enter ".$col." Type");
-            }
-            $col = trim($col);
+				if($colType == "")
+					dd("Error : Enter ".$col." Type");
+			}
+			else{
+				if($col != "id")
+					dd("Error : Enter ".$col." Type");
+			}
+			$col = trim($col);
 			$colName='COL_'.strtoupper($colPrefix).'_'.strtoupper($col);
 			$colNames[$col] = $colName;
 			$data.="define('$colName', '".strtolower($col)."');\n";
-
 
 
 			if($col=='id'){
 				$migrateData.='$table->increments('.$colName.');'."\n";
 			}else{
 
-                $colType = trim($colType);
-                $colPrefix = trim($colPrefix);
-                $colName = trim($colName);
-                $col = trim($col);
+				$colType = trim($colType);
+				$colPrefix = trim($colPrefix);
+				$colName = trim($colName);
+				$col = trim($col);
 
-				$migrateData .= $this -> generateMigrationRow($colType,$colPrefix, $colName,$col);
-				$factoryData .= $this -> generateFactoryRow($colType,$colName);
+
+				if(strpos($colType,"enum") !== false){
+					$currentType = \str_replace("enum","",$colType);
+					$currentType = \str_replace(":","",$currentType);
+
+					$currentEnumsArray = explode(",",$currentType);
+
+					$migrationColType = $this -> migrationColType('enum',$colPrefix, $colName,$col,$currentEnumsArray, true);
+					$factoryColValue = $this -> factoryColValue('enum',$currentEnumsArray);
+
+				}
+				else{
+					$migrationColType = $this -> migrationColType($colType,$colPrefix, $colName,$col);
+					$factoryColValue = $this -> factoryColValue($colType);
+
+				}
+
+
+				$migrateData.='$table->'.$migrationColType."\n";
+
+				$factoryData .= $colName.' => '.$factoryColValue.','."\n";
 			}
 
 
@@ -628,13 +806,161 @@ class ConstController {
 
 
 
-        $data.="\n\n\n\n";
+		$data.="\n\n\n\n";
 
 		return array($data,$tableName,$migrateData,$scopeData,$scopeHintData,$factoryData, $colNames);
-    }
+	}
 
 
-	// ---------------------------------------------------------------------------------------
+
+
+
+
+	// ----------------------------------------------------------------------------------------------------------------
+	public function addNewColumn($newCols,$colSamplePrefix, $table, $model,$constsFileContent,$pos,$constsPath){
+		// creating the new column constant : COL_BANK_NEW
+		list($data,$tableName,$migrateData,$scopeData,$scopeHintData,$factoryData, $colNames) = $this->colsDataCreation($newCols,$colSamplePrefix, $table, $model);
+		$data = trim($data);
+
+		$constsFileContent=substr($constsFileContent,0,$pos+1).$data."\n".substr($constsFileContent,$pos+1);
+
+
+		// finding migration file
+		$migFile = DB::table('migrations')->where('migration','LIKE',"%$table%")->first();
+		if($migFile == null)
+			dd('ERROR : migration file not found in the database migration table');
+
+		$migFilePath='../database/migrations/'.$migFile->migration.'.php';
+		$migFileContent = file_get_contents($migFilePath);
+
+
+		$tPos1 = strpos($migFileContent,'$table', strpos($migFileContent, '$table') + 1); // TODO : find last $table
+		$tPos2 = strpos($migFileContent,"\n",$tPos1);
+		$migFileContent=substr($migFileContent,0,$tPos2+1).$migrateData."\n".substr($migFileContent,$tPos2+1);
+
+
+
+		// factory
+		$factoryPath='../database/factories/'.$model.'Factory.php';
+		$factoryFileContent=file_get_contents($factoryPath);
+		$facPos1 = strpos($factoryFileContent, "]");
+		$factoryFileContent=substr($factoryFileContent,0,$facPos1-1).$factoryData."\n".substr($factoryFileContent,$facPos1-1);
+		$factoryFileContent = trim($factoryFileContent);
+
+
+
+		// TODO
+		// model
+		// if($scopeData != ""){
+		//     $modelPath='../app/models/'.$model.'.php';
+		//     $modelFileContent=file_get_contents($modelPath);
+		//     $modelFileContent=str_replace('use HasFactory;',$scopeData,$modelFileContent);
+		//     $modelFileContent=substr($modelFileContent,0,125).$scopeHintData.substr($modelFileContent,125);
+		//     $modelFileContent=substr($modelFileContent,0,29).'use App\Models\ModelEnhanced;'.substr($modelFileContent,29);
+		//     $ModelPos=strpos($modelFileContent,'Model',strpos($modelFileContent,'extends'));
+		//     $modelFileContent=substr_replace($modelFileContent,'ModelEnhanced',$ModelPos,5);
+
+		// file_put_contents($modelPath,$modelFileContent);
+
+		// }
+
+
+
+
+
+		file_put_contents($constsPath,$constsFileContent);
+		file_put_contents($migFilePath,$migFileContent);
+		file_put_contents($factoryPath,$factoryFileContent);
+
+
+		   DB::statement('ALTER TABLE '.$table.' ADD new1 int');
+	}
+
+
+
+
+	// -----------------------------------------------------------------------------------------
+	public function modifyColumn($modifiedCols,$table,$colSamplePrefix,$model){
+
+		foreach($modifiedCols as $col){
+
+
+
+			$colNameConstant  = 'COL_'.$colSamplePrefix.'_'.strtoupper($col['name']);
+
+			// -----------------------  mofiding migration file
+			$migFile = DB::table('migrations')->where('migration','LIKE',"%$table%")->first();
+			$migFilePath='../database/migrations/'.$migFile->migration.'.php';
+			$migFileContent = file_get_contents($migFilePath);
+
+
+			$migrateData = $this -> generateMigrationRow($col['new_type'],$colSamplePrefix, $colNameConstant ,$col['name'],$col['enums'], false);
+
+			$tPos1 = strpos($migFileContent,$colNameConstant);
+			$tPos2 = strrpos($migFileContent,'$table',-strlen($migFileContent)+$tPos1-1); // search before
+			$tPos3 = strpos($migFileContent,"\n",$tPos1);
+			$migFileContent=substr($migFileContent,0,$tPos2).$migrateData."\n".substr($migFileContent,$tPos3+1);
+
+			file_put_contents($migFilePath,$migFileContent);
+
+
+			// ---------------------------------------------- factory file
+			$factoryPath='../database/factories/'.$model.'Factory.php';
+			$factoryFileContent=file_get_contents($factoryPath);
+			$facPos1 = strpos($factoryFileContent, $colNameConstant);
+			$facPos2 = strpos($factoryFileContent,"\n",$facPos1);
+
+			$factoryData = $this -> generateFactoryRow($col['new_type'],$colNameConstant,$col['enums']);
+
+			$factoryFileContent=substr($factoryFileContent,0,$facPos1).$factoryData."\n".substr($factoryFileContent,$facPos2+1);
+			$factoryFileContent = trim($factoryFileContent);
+
+			file_put_contents($factoryPath,$factoryFileContent);
+
+
+			if($col['is_enum'] == 0){
+				$sql = 'ALTER TABLE '.$table.' MODIFY  COLUMN '.$col['name'].''.$col['new_type'];
+			}
+			else{
+				$sql = 'ALTER TABLE '.$table.' MODIFY  COLUMN '.$col['name'].' enum(\''.implode("','",$col['enums']).'\')';
+
+
+				$constsPath='../app/Extras/consts.php';
+				$constsFileContent=file_get_contents($constsPath);
+				$pos=0;
+
+
+				$a = [];
+
+
+				foreach($col['old_enums'] as $oldEnum){
+					$enumConst = "ENUM_". \strtoupper($colSamplePrefix)."_".strtoupper($col['name'])."_".strtoupper($oldEnum);
+					$a[] = $enumConst;
+
+					$pos=strpos($constsFileContent, $enumConst);
+					$pos2=strrpos($constsFileContent, "\n", -strlen($constsFileContent)+$pos-1)+1; // search before
+					$pos3=strpos($constsFileContent,"\n",$pos);
+
+					$constsFileContent =substr($constsFileContent,0,$pos2).substr($constsFileContent,$pos3+1);
+				}
+
+				file_put_contents($constsPath,$constsFileContent);
+				$enumConsts = $this -> enumConstGenerator($col['enums'],$colSamplePrefix,$col['name']);
+
+			}
+
+			 DB::statement($sql);
+
+			$sqlchangesData = "\n # const generator \n $sql \n";
+			\file_put_contents(base_path().'/db_changes.sql',$sqlchangesData, FILE_APPEND);
+
+
+		}
+		}
+
+
+
+		// ---------------------------------------------------------------------------------------
 
 	public function casts(){
 		$files = scandir(app_path('../database/migrations'));
