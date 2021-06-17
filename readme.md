@@ -23,3 +23,8 @@
 4- add consts file
         
         php artisan vendor:publish --provider="Colbeh\Consts\ServiceProvider" --tag=app
+
+
+#Upgrade:
+ 
+        composer require colbeh/consts:x.x.x

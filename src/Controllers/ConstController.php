@@ -8,6 +8,12 @@ use Illuminate\Support\Str;
 
 class ConstController {
 
+	const constsPath="../app/Extras/consts.php";
+	const migrationsPath='../database/migrations/';
+	const modelsPath='../app/models/';
+	const factoriesPath='../database/factories/';
+	const controllersPath='../app/Http/Controllers/';
+	const routesPath='../routes/web.php';
 
 	public function  index() {
 
@@ -302,7 +308,7 @@ class ConstController {
     // ---------------------------------------------------------------------------------------------
 	public function writeConsts($data, $tableOrEnum='table') {
 
-		$constsPath='../app/Extras/consts.php';
+		$constsPath=self::constsPath;
 		$charsCountAfterHeader=218;
 		$constsFileContent=file_get_contents($constsPath);
 		$pos=0;
@@ -322,7 +328,7 @@ class ConstController {
 
 		$output=Artisan::output();
 		$migrationName=explode(" ",str_replace("\r\n","",$output))[2];
-		$migrationPath='../database/migrations/'.$migrationName.'.php';
+		$migrationPath=self::migrationsPath.$migrationName.'.php';
 		$migrationFileContent=file_get_contents($migrationPath);
 		$migrationFileContent=str_replace("'".strtolower($table)."'",$tableName,$migrationFileContent);
 		$migrationFileContent=str_replace('$table->id();',$migrateData,$migrationFileContent);
@@ -334,7 +340,7 @@ class ConstController {
 	public function writeModel($modalName, $scopeData, $scopeHintData) {
 		Artisan::call("make:model $modalName");
 
-		$modelPath='../app/models/'.$modalName.'.php';
+		$modelPath=self::modelsPath.$modalName.'.php';
 		$modelFileContent=file_get_contents($modelPath);
 		$modelFileContent=str_replace('use HasFactory;',$scopeData,$modelFileContent);
 		$modelFileContent=substr_replace($modelFileContent,$scopeHintData,125,0);
@@ -350,7 +356,7 @@ class ConstController {
     // ---------------------------------------------------------------------------------------------
 	public function writeFactory($modalName, $factoryData) {
 		Artisan::call("make:factory ".$modalName."Factory --model=".$modalName);
-		$factoryPath='../database/factories/'.$modalName.'Factory.php';
+		$factoryPath=self::factoriesPath.$modalName.'Factory.php';
 		$factoryFileContent=file_get_contents($factoryPath);
 		$factoryFileContent=str_replace('//',$factoryData,$factoryFileContent);
 		file_put_contents($factoryPath,$factoryFileContent);
@@ -370,7 +376,7 @@ class ConstController {
 
     // ---------------------------------------------------------------------------------------------
     public function fillControllerMethods($modelName,$cols){
-        $controllerPath = '../app/Http/Controllers/'.$modelName.'Controller.php';
+        $controllerPath = self::controllersPath.$modelName.'Controller.php';
         $content = file_get_contents($controllerPath);
 
         $colsData = "";
@@ -453,7 +459,7 @@ class ConstController {
 
     // ---------------------------------------------------------------------------------------------
 	public function createRoute($modelName,$controllerName) {
-		$routePath='../routes/web.php';
+		$routePath=self::routesPath;
 		$routeData='
 	Route::resource("'.lcfirst($modelName).'","'.$controllerName.'");';
 		file_put_contents($routePath,$routeData,FILE_APPEND);
@@ -477,46 +483,18 @@ class ConstController {
 	public function columnAdd(){
 		$table = request('table');
 		$cols = request('cols');
-		$data = '';
 
 
-		$tableName="TBL_".strtoupper($table);
 
-
-		$constsPath='../app/Extras/consts.php';
+		$constsPath=self::constsPath;
 		$constsFileContent=file_get_contents($constsPath);
-		$pos=0;
 
-		$pos=strpos($constsFileContent, "define('".$tableName."', '".$table."')");
-		$pos=strpos($constsFileContent, "\n",$pos);
+		$startColumnsPos=$this->getStartPosOfDefineColumns($table,$constsFileContent);
 
+		$colPrefix = $this->getColumnPrefix($constsFileContent,$startColumnsPos);
 
-		$colSample = \substr($constsFileContent, $pos+1, strpos($constsFileContent, "\n",$pos+1) - $pos);
+		$model = Str::studly(Str::singular($table)); // todo: get $colPrefix and $model from user - we can suggest these value in index method to user
 
-		// extracting the column name and make it upper case : id => ID
-		$colSampleName = substr($colSample, strpos($colSample, ","));
-		$colSampleName = \str_replace(',','',$colSampleName);
-		$colSampleName = \str_replace("'",'',$colSampleName);
-		$colSampleName = \str_replace(")",'',$colSampleName);
-		$colSampleName = \str_replace("\n",'',$colSampleName);
-		$colSampleName = \str_replace(";",'',$colSampleName);
-		$colSampleName = strtoupper($colSampleName);
-		$colSampleName = trim($colSampleName);
-
-
-		// extracting something like this : COL_BANK_ID    and turn it to : COL_BANK_   as the prefix
-		$colSamplePrefix = substr($colSample, strpos($colSample, "("),  strpos($colSample, ",") - strpos($colSample, "("));
-		$colSamplePrefix = \str_replace('(','',$colSamplePrefix);
-		$colSamplePrefix = \str_replace("'",'',$colSamplePrefix);
-		$colSamplePrefix = \str_replace("'",'',$colSamplePrefix);
-		$colSamplePrefix = substr($colSamplePrefix,0, strpos($colSamplePrefix,$colSampleName));
-		$colSamplePrefix = \str_replace('COL_','',$colSamplePrefix);
-		$colSamplePrefix = \str_replace('_','',$colSamplePrefix);
-
-
-
-
-		$model = Str::studly(Str::singular($table));
 		$modelDirectory = 'App\Models\\' . $model;
 		if(!class_exists($modelDirectory)) {
 			dd('Model not found'); // TODO
@@ -530,9 +508,9 @@ class ConstController {
 			dd("NOT ALLOWED TO REMOVE COLS");
 
 
-		$this->addNewColumn($newCols,$colSamplePrefix, $table, $model,$constsFileContent,$pos,$constsPath);
+		$this->addNewColumn($newCols,$colPrefix, $table, $model,$constsFileContent,$startColumnsPos,$constsPath);
 
-		$this->modifyColumn($modifiedCols,$table,$colSamplePrefix,$model);
+		$this->modifyColumn($modifiedCols,$table,$colPrefix,$model);
 
 
 
@@ -540,7 +518,32 @@ class ConstController {
 
 	}
 
+	private function getStartPosOfDefineColumns($table,$constsFileContent) {
+		$tableName="TBL_".strtoupper($table);
+		$pos=strpos($constsFileContent, "define('".$tableName."', '".$table."')");
+		$pos=strpos($constsFileContent, "\n",$pos); // position of end of line of define TBL
 
+		return $pos;
+	}
+
+	private function getColumnPrefix($constsFileContent, $startColumnsPos) {
+
+		$colSample = \substr($constsFileContent, $startColumnsPos+1, strpos($constsFileContent, "\n",$startColumnsPos+1) - $startColumnsPos); // =>  define('COL_BASKET_ID', 'id');
+
+		// extracting the column name and make it upper case : id => ID
+		$colSampleName = substr($colSample, strpos($colSample, ","));
+		$colSampleName = \str_replace([',',"'",")","\n",";"],'',$colSampleName);
+		$colSampleName = strtoupper($colSampleName);
+		$colSampleName = trim($colSampleName);  // => ID
+
+		// extracting something like this : COL_BANK_ID    and turn it to : COL_BANK_   as the prefix
+		$colSamplePrefix = substr($colSample, strpos($colSample, "("),  strpos($colSample, ",") - strpos($colSample, "("));
+		$colSamplePrefix = \str_replace(['(',"'","'",'COL_'],'',$colSamplePrefix);
+		$colSamplePrefix = substr($colSamplePrefix,0, strpos($colSamplePrefix,'_'.$colSampleName));
+		$colSamplePrefix = \str_replace('_','',$colSamplePrefix);
+
+		return $colSamplePrefix;
+	}
 
 
 
@@ -830,7 +833,7 @@ class ConstController {
 		if($migFile == null)
 			dd('ERROR : migration file not found in the database migration table');
 
-		$migFilePath='../database/migrations/'.$migFile->migration.'.php';
+		$migFilePath=self::migrationsPath.$migFile->migration.'.php';
 		$migFileContent = file_get_contents($migFilePath);
 
 
@@ -841,7 +844,7 @@ class ConstController {
 
 
 		// factory
-		$factoryPath='../database/factories/'.$model.'Factory.php';
+		$factoryPath=self::factoriesPath.$model.'Factory.php';
 		$factoryFileContent=file_get_contents($factoryPath);
 		$facPos1 = strpos($factoryFileContent, "]");
 		$factoryFileContent=substr($factoryFileContent,0,$facPos1-1).$factoryData."\n".substr($factoryFileContent,$facPos1-1);
@@ -852,7 +855,7 @@ class ConstController {
 		// TODO
 		// model
 		// if($scopeData != ""){
-		//     $modelPath='../app/models/'.$model.'.php';
+//		     $modelPath=self::modelsPath.$model.'.php';
 		//     $modelFileContent=file_get_contents($modelPath);
 		//     $modelFileContent=str_replace('use HasFactory;',$scopeData,$modelFileContent);
 		//     $modelFileContent=substr($modelFileContent,0,125).$scopeHintData.substr($modelFileContent,125);
@@ -873,7 +876,7 @@ class ConstController {
 		file_put_contents($factoryPath,$factoryFileContent);
 
 
-		   DB::statement('ALTER TABLE '.$table.' ADD new1 int');
+//		   DB::statement('ALTER TABLE '.$table.' ADD new1 int');
 	}
 
 
@@ -890,7 +893,7 @@ class ConstController {
 
 			// -----------------------  mofiding migration file
 			$migFile = DB::table('migrations')->where('migration','LIKE',"%$table%")->first();
-			$migFilePath='../database/migrations/'.$migFile->migration.'.php';
+			$migFilePath=self::migrationsPath.$migFile->migration.'.php';
 			$migFileContent = file_get_contents($migFilePath);
 
 
@@ -905,7 +908,7 @@ class ConstController {
 
 
 			// ---------------------------------------------- factory file
-			$factoryPath='../database/factories/'.$model.'Factory.php';
+			$factoryPath=self::factoriesPath.$model.'Factory.php';
 			$factoryFileContent=file_get_contents($factoryPath);
 			$facPos1 = strpos($factoryFileContent, $colNameConstant);
 			$facPos2 = strpos($factoryFileContent,"\n",$facPos1);
@@ -925,7 +928,7 @@ class ConstController {
 				$sql = 'ALTER TABLE '.$table.' MODIFY  COLUMN '.$col['name'].' enum(\''.implode("','",$col['enums']).'\')';
 
 
-				$constsPath='../app/Extras/consts.php';
+				$constsPath=self::constsPath;
 				$constsFileContent=file_get_contents($constsPath);
 				$pos=0;
 
@@ -949,7 +952,7 @@ class ConstController {
 
 			}
 
-			 DB::statement($sql);
+//			 DB::statement($sql);
 
 			$sqlchangesData = "\n # const generator \n $sql \n";
 			\file_put_contents(base_path().'/db_changes.sql',$sqlchangesData, FILE_APPEND);
@@ -963,13 +966,13 @@ class ConstController {
 		// ---------------------------------------------------------------------------------------
 
 	public function casts(){
-		$files = scandir(app_path('../database/migrations'));
+		$files = scandir(app_path(self::migrationsPath));
 		$allcasts = '';
 		$cols = [];
 
 		foreach($files as $file){
 			if($file != '.' && $file != '..' ){
-				$m = file_get_contents(app_path('../database/migrations/'.$file));
+				$m = file_get_contents(app_path(self::migrationsPath.$file));
 				$pos = 0;
 				do{
 					$pos = strpos($m,'integer(',$pos+1);
