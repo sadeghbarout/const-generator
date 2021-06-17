@@ -20,4 +20,6 @@
 
         domain.com/const
         
-4- add tables        
+4- add consts file
+        
+        php artisan vendor:publish --provider="Colbeh\Consts\ServiceProvider" --tag=app
