@@ -16,7 +16,7 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider {
 		$this->loadViewsFrom(__DIR__ . '/Views', 'const');
 
 		$this->publishes([
-			__DIR__.'/consts.php' => app_path('Extras'),
+			__DIR__.'/consts.php' => app_path('Extras/consts.php'),
 		], 'app');
 
 	}
