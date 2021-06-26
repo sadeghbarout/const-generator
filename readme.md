@@ -1,8 +1,8 @@
-#Installation: 
+# Installation: 
 
-1- composer require colbeh/consts
+1- Composer require colbeh/consts
 
-2- make sure you have app/Extras/consts.php and added to composer.json
+2- Make sure you have app/Extras/consts.php and added to composer.json
 
         ...
         
@@ -16,16 +16,16 @@
             
         ...
 
-3- go to 
+3- Go to 
 
         domain.com/const
         
-4- add consts file
+4- Add consts file
         
         php artisan vendor:publish --provider="Colbeh\Consts\ServiceProvider" --tag=app
 
 
-#Upgrade:
+# Upgrade:
  
         composer require colbeh/consts:x.x.x
 
