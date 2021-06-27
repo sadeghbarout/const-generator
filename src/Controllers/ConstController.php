@@ -382,7 +382,7 @@ class ConstController {
         $colsData = "";
         foreach($cols as $index => $col){
             if($index !=  "id")
-                $colsData .= '          $c['.$col.'] = request('.$col.');'."\n";
+                $colsData .= '          $item['.$col.'] = request('.$col.');'."\n";
         }
 
 
@@ -416,6 +416,8 @@ class ConstController {
             $item = new '.$modelName.'();
 '.$colsData.'
             $item -> save();
+            return generateResponse(RES_SUCCESS,array(\'item\' => $item));
+
         ';
         $content = substr_replace($content,$storeOp,$storeOperationPos,2);
 
@@ -427,6 +429,7 @@ class ConstController {
             $item = '.$modelName.'::findOrError($id);
 '.$colsData.'
             $item -> save();
+            return generateResponse(RES_SUCCESS,array(\'item\' => $item));
         ';
         $content = substr_replace($content,$updateOp,$updateOperationPos,2);
 
