@@ -17,11 +17,11 @@ class ConstController {
 
 	public function  index() {
 
-        $dbName = env('DB_DATABASE');
-        $tablesRaw = DB::select('SHOW TABLES');
+		$dbName = env('DB_DATABASE');
+		$tablesRaw = DB::select('SHOW TABLES');
 
-        $tables = [];
-        $tablesIn = 'Tables_in_'.$dbName;
+		$tables = [];
+		$tablesIn = 'Tables_in_'.$dbName;
 		foreach($tablesRaw as $table){
 
 			$tableName = $table -> $tablesIn;
@@ -39,7 +39,7 @@ class ConstController {
 		$tables = json_encode($tables);
 
 		return view("const::index", compact('tables'));
-    }
+	}
 
 
 	// ---------------------------------------------------------------------------------------------
@@ -48,27 +48,27 @@ class ConstController {
 		$table=request('table');
 		$colPrefix=request('colPrefix');
 		$cols=request('cols');
-        $withController=request('withController');
+		$withController=request('withController');
 
 
-        list($data,$tableName,$migrateData,$scopeData,$scopeHintData,$factoryData, $colNames)=$this->createData($modelName,$table,$colPrefix,$cols);
+		list($data,$tableName,$migrateData,$scopeData,$scopeHintData,$factoryData, $colNames)=$this->createData($modelName,$table,$colPrefix,$cols);
 
-		 $this->writeConsts($data,'table');
-		 $this->writeMigration($table,$tableName,$migrateData);
-		 $this->writeModel($modelName,$scopeData,$scopeHintData);
-		 $this->writeFactory($modelName,$factoryData);
-		 $this->writeController($withController,$modelName,$colNames);
+		$this->writeConsts($data,'table');
+		$this->writeMigration($table,$tableName,$migrateData);
+		$this->writeModel($modelName,$scopeData,$scopeHintData);
+		$this->writeFactory($modelName,$factoryData);
+		$this->writeController($withController,$modelName,$colNames);
 
 
 		if($withController){
-            return redirect() -> back() -> with('status', $modelName.' model,consts,migration,controller,route and facrory successfully generated!');
+			return redirect() -> back() -> with('status', $modelName.' model,consts,migration,controller,route and facrory successfully generated!');
 		}else{
-            return redirect() -> back() -> with('status', $modelName.' model,consts,migration and facrory successfully generated!');
+			return redirect() -> back() -> with('status', $modelName.' model,consts,migration and facrory successfully generated!');
 		}
-    }
+	}
 
 
-    // ---------------------------------------------------------------------------------------------
+	// ---------------------------------------------------------------------------------------------
 	public function createData($modalName,$table,$colPrefix,$cols) {
 		$cols=explode("\r\n",$cols);
 
@@ -111,7 +111,7 @@ class ConstController {
 		$constData.="\n\n\n\n";
 
 		return array($constData,$tableName,$migrateData,$scopeData,$scopeHintData,$factoryData, $colNames);
-    }
+	}
 
 
 	private function checkHasScope($col) {
@@ -151,7 +151,7 @@ class ConstController {
 		}
 
 		return [$colType,$col,$enumsArray];
-    }
+	}
 
 	// ---------------------------------------------------------------------------------------------
 	public function generateFactoryRow($colType,$colName,$data=null){
@@ -305,7 +305,7 @@ class ConstController {
 
 	';
 	}
-    // ---------------------------------------------------------------------------------------------
+	// ---------------------------------------------------------------------------------------------
 	public function writeConsts($data, $tableOrEnum='table') {
 
 		$constsPath=self::constsPath;
@@ -322,7 +322,7 @@ class ConstController {
 	}
 
 
-    // ---------------------------------------------------------------------------------------------
+	// ---------------------------------------------------------------------------------------------
 	public function writeMigration($table, $tableName, $migrateData) {
 		Artisan::call("make:migration create_".$table."_table --create=".$table);
 
@@ -336,7 +336,7 @@ class ConstController {
 	}
 
 
-    // ---------------------------------------------------------------------------------------------
+	// ---------------------------------------------------------------------------------------------
 	public function writeModel($modalName, $scopeData, $scopeHintData) {
 		Artisan::call("make:model $modalName");
 
@@ -353,7 +353,7 @@ class ConstController {
 	}
 
 
-    // ---------------------------------------------------------------------------------------------
+	// ---------------------------------------------------------------------------------------------
 	public function writeFactory($modalName, $factoryData) {
 		Artisan::call("make:factory ".$modalName."Factory --model=".$modalName);
 		$factoryPath=self::factoriesPath.$modalName.'Factory.php';
@@ -374,28 +374,28 @@ class ConstController {
 	}
 
 
-    // ---------------------------------------------------------------------------------------------
-    public function fillControllerMethods($modelName,$cols){
-        $controllerPath = self::controllersPath.$modelName.'Controller.php';
-        $content = file_get_contents($controllerPath);
+	// ---------------------------------------------------------------------------------------------
+	public function fillControllerMethods($modelName,$cols){
+		$controllerPath = self::controllersPath.$modelName.'Controller.php';
+		$content = file_get_contents($controllerPath);
 
-        $colsData = "";
-        foreach($cols as $index => $col){
-            if($index !=  "id")
-                $colsData .= '          $item['.$col.'] = request('.$col.');'."\n";
-        }
-
-
-        // ---------------------------------------------------------- use Model
-        $indexPos = strpos($content,'use Illuminate\Http\Request;');
-        $indexOp = 'use App\Models\\'.$modelName.';';
-        $content = substr_replace($content,$indexOp,$indexPos-1,0);
+		$colsData = "";
+		foreach($cols as $index => $col){
+			if($index !=  "id")
+				$colsData .= '          $item['.$col.'] = request('.$col.');'."\n";
+		}
 
 
-        // ---------------------------------------------------------- index
-        $indexPos = strpos($content,'index(');
-        $indexOperationPos = strpos($content,'//',$indexPos);
-        $indexOp = '$rowsCount = request("rows_count",10);
+		// ---------------------------------------------------------- use Model
+		$indexPos = strpos($content,'use Illuminate\Http\Request;');
+		$indexOp = 'use App\Models\\'.$modelName.';';
+		$content = substr_replace($content,$indexOp,$indexPos-1,0);
+
+
+		// ---------------------------------------------------------- index
+		$indexPos = strpos($content,'index(');
+		$indexOperationPos = strpos($content,'//',$indexPos);
+		$indexOp = '$rowsCount = request("rows_count",10);
 		$page = request("page", 1);
 
 		$builder = '.$modelName.'::id("");
@@ -406,61 +406,61 @@ class ConstController {
 
 		return generateResponse(RES_SUCCESS,array(\'items\' => $items , \'page_count\' => $pageCount));
         ';
-        $content = substr_replace($content,$indexOp,$indexOperationPos,2);
+		$content = substr_replace($content,$indexOp,$indexOperationPos,2);
 
 
-        // ---------------------------------------------------------- store
-        $storePos = strpos($content,'store(');
-        $storeOperationPos = strpos($content,'//',$storePos);
-        $storeOp = '
+		// ---------------------------------------------------------- store
+		$storePos = strpos($content,'store(');
+		$storeOperationPos = strpos($content,'//',$storePos);
+		$storeOp = '
             $item = new '.$modelName.'();
 '.$colsData.'
             $item -> save();
             return generateResponse(RES_SUCCESS,array(\'item\' => $item));
 
         ';
-        $content = substr_replace($content,$storeOp,$storeOperationPos,2);
+		$content = substr_replace($content,$storeOp,$storeOperationPos,2);
 
 
-        // ------------------------------------------------------------- update
-        $updatePos = strpos($content,'update(');
-        $updateOperationPos = strpos($content,'//',$updatePos);
-        $updateOp = '
+		// ------------------------------------------------------------- update
+		$updatePos = strpos($content,'update(');
+		$updateOperationPos = strpos($content,'//',$updatePos);
+		$updateOp = '
             $item = '.$modelName.'::findOrError($id);
 '.$colsData.'
             $item -> save();
             return generateResponse(RES_SUCCESS,array(\'item\' => $item));
         ';
-        $content = substr_replace($content,$updateOp,$updateOperationPos,2);
+		$content = substr_replace($content,$updateOp,$updateOperationPos,2);
 
 
-        // ------------------------------------------------------------- destroy
-        $destroyPos = strpos($content,'destroy(');
-        $destroyOperationPos = strpos($content,'//',$destroyPos);
-        $destroyOp = '
+		// ------------------------------------------------------------- destroy
+		$destroyPos = strpos($content,'destroy(');
+		$destroyOperationPos = strpos($content,'//',$destroyPos);
+		$destroyOp = '
             $item = '.$modelName.'::findOrError($id);
             $item -> delete();
         ';
-        $content = substr_replace($content,$destroyOp,$destroyOperationPos,2);
+		$content = substr_replace($content,$destroyOp,$destroyOperationPos,2);
 
-        // ------------------------------------------------------------- show
-        $showPos = strpos($content,'show(');
-        $showOperationPos = strpos($content,'//',$showPos);
-        $showOp = '
+		// ------------------------------------------------------------- show
+		$showPos = strpos($content,'show(');
+		$showOperationPos = strpos($content,'//',$showPos);
+		$showOp = '
             $item = '.$modelName.'::findOrError($id);
             return generateResponse(RES_SUCCESS,["item"=>$item]);
         ';
-        $content = substr_replace($content,$showOp,$showOperationPos,2);
+		$content = substr_replace($content,$showOp,$showOperationPos,2);
 
 
 		// put content in file
 		file_put_contents($controllerPath,$content);
 
-        return;
-    }
+		return;
+	}
 
 
-    // ---------------------------------------------------------------------------------------------
+	// ---------------------------------------------------------------------------------------------
 	public function createRoute($modelName,$controllerName) {
 		$routePath=self::routesPath;
 		$routeData='
@@ -470,7 +470,7 @@ class ConstController {
 	}
 
 
-    // -------------------------------------------------------------------------------------------------------------
+	// -------------------------------------------------------------------------------------------------------------
 
 	// ----------------------------------------------------------------------------------------------------------------------------------------------
 	// ----------------------------------------------------------------------------------------------------------------------------------------------
@@ -511,7 +511,7 @@ class ConstController {
 			dd("NOT ALLOWED TO REMOVE COLS");
 
 
-		$this->addNewColumn($newCols,$colPrefix, $table, $model,$constsFileContent,$startColumnsPos,$constsPath);
+		$this->addNewColumn($newCols,$colPrefix, $table, $model,$startColumnsPos,$constsPath);
 
 		$this->modifyColumn($modifiedCols,$table,$colPrefix,$model);
 
@@ -532,13 +532,11 @@ class ConstController {
 	private function getColumnPrefix($constsFileContent, $startColumnsPos) {
 
 		$colSample = \substr($constsFileContent, $startColumnsPos+1, strpos($constsFileContent, "\n",$startColumnsPos+1) - $startColumnsPos); // =>  define('COL_BASKET_ID', 'id');
-
 		// extracting the column name and make it upper case : id => ID
 		$colSampleName = substr($colSample, strpos($colSample, ","));
 		$colSampleName = \str_replace([',',"'",")","\n",";"],'',$colSampleName);
 		$colSampleName = strtoupper($colSampleName);
 		$colSampleName = trim($colSampleName);  // => ID
-
 		// extracting something like this : COL_BANK_ID    and turn it to : COL_BANK_   as the prefix
 		$colSamplePrefix = substr($colSample, strpos($colSample, "("),  strpos($colSample, ",") - strpos($colSample, "("));
 		$colSamplePrefix = \str_replace(['(',"'","'",'COL_'],'',$colSamplePrefix);
@@ -722,6 +720,7 @@ class ConstController {
 		$scopeHintData = '';
 		$scopeData = '';
 		$factoryData  = '';
+		$colNames  = [];
 
 
 		foreach ($cols AS $col){
@@ -769,13 +768,13 @@ class ConstController {
 
 					$currentEnumsArray = explode(",",$currentType);
 
-					$migrationColType = $this -> migrationColType('enum',$colPrefix, $colName,$col,$currentEnumsArray, true);
-					$factoryColValue = $this -> factoryColValue('enum',$currentEnumsArray);
+					$migrationColType = $this -> generateMigrationRow('enum',$colPrefix, $colName,$col,$currentEnumsArray, true);
+					$factoryColValue = $this -> generateFactoryRow('enum',$colName,$currentEnumsArray);
 
 				}
 				else{
-					$migrationColType = $this -> migrationColType($colType,$colPrefix, $colName,$col);
-					$factoryColValue = $this -> factoryColValue($colType);
+					$migrationColType = $this -> generateMigrationRow($colType,$colPrefix, $colName,$col);
+					$factoryColValue = $this -> generateFactoryRow($colType,$colName);
 
 				}
 
@@ -823,11 +822,12 @@ class ConstController {
 
 
 	// ----------------------------------------------------------------------------------------------------------------
-	public function addNewColumn($newCols,$colSamplePrefix, $table, $model,$constsFileContent,$pos,$constsPath){
+	public function addNewColumn($newCols,$colSamplePrefix, $table, $model,$pos,$constsPath){
 		// creating the new column constant : COL_BANK_NEW
 		list($data,$tableName,$migrateData,$scopeData,$scopeHintData,$factoryData, $colNames) = $this->colsDataCreation($newCols,$colSamplePrefix, $table, $model);
 		$data = trim($data);
 
+		$constsFileContent=file_get_contents($constsPath);
 		$constsFileContent=substr($constsFileContent,0,$pos+1).$data."\n".substr($constsFileContent,$pos+1);
 
 
@@ -879,6 +879,7 @@ class ConstController {
 		file_put_contents($factoryPath,$factoryFileContent);
 
 
+		// todo
 //		   DB::statement('ALTER TABLE '.$table.' ADD new1 int');
 	}
 
@@ -951,7 +952,7 @@ class ConstController {
 				}
 
 				file_put_contents($constsPath,$constsFileContent);
-				$enumConsts = $this -> enumConstGenerator($col['enums'],$colSamplePrefix,$col['name']);
+				$enumConsts = $this -> enumConstGenerator($col['enums'],$colSamplePrefix,$col['name'],true);
 
 			}
 
@@ -962,11 +963,11 @@ class ConstController {
 
 
 		}
-		}
+	}
 
 
 
-		// ---------------------------------------------------------------------------------------
+	// ---------------------------------------------------------------------------------------
 
 	public function casts(){
 		$files = scandir(app_path(self::migrationsPath));
