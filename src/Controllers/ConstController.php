@@ -5,6 +5,7 @@ namespace Colbeh\Consts\Controllers;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Colbeh\Consts\Helper;
 
 class ConstController {
 
@@ -14,32 +15,39 @@ class ConstController {
 	const factoriesPath='../database/factories/';
 	const controllersPath='../app/Http/Controllers/';
 	const routesPath='../routes/web.php';
+	const dbStructureJsonFilePath='../resources/files/database-structure.json';
+	const utilsJsonFilePath='../resources/files/utils.json';
 
 	public function  index() {
+		return view("builder::index");
+    }
 
-		$dbName = env('DB_DATABASE');
-		$tablesRaw = DB::select('SHOW TABLES');
 
-		$tables = [];
-		$tablesIn = 'Tables_in_'.$dbName;
-		foreach($tablesRaw as $table){
+    // ---------------------------------------------------------------------------------------------
+    public function column(){
+        $dbName = env('DB_DATABASE');
+        $tablesRaw = DB::select('SHOW TABLES');
 
-			$tableName = $table -> $tablesIn;
+        $tables = [];
+        $tablesIn = 'Tables_in_'.$dbName;
+        foreach($tablesRaw as $table){
 
-			$tableColumns = DB::select("SHOW COLUMNS FROM ". $tableName);
+            $tableName = $table -> $tablesIn;
 
-			$tables[$tableName]['table_name'] = $tableName;
+            $tableColumns = DB::select("SHOW COLUMNS FROM ". $tableName);
 
-			foreach($tableColumns as &$tc){
-				$tc = $this->convertDatabaseColumnTypeToOurStandard($tc);
-			}
+            $tables[$tableName]['table_name'] = $tableName;
 
-			$tables[$tableName]['cols'] = $tableColumns;
-		}
-		$tables = json_encode($tables);
+            foreach($tableColumns as &$tc){
+                $tc = $this->convertDatabaseColumnTypeToOurStandard($tc);
+            }
 
-		return view("const::index", compact('tables'));
-	}
+            $tables[$tableName]['cols'] = $tableColumns;
+        }
+        $tables = json_encode($tables);
+
+        return view("builder::newColumn", compact('tables'));
+    }
 
 
 	// ---------------------------------------------------------------------------------------------
@@ -48,29 +56,33 @@ class ConstController {
 		$table=request('table');
 		$colPrefix=request('colPrefix');
 		$cols=request('cols');
-		$withController=request('withController');
+        $withController=request('withController');
 
 
-		list($data,$tableName,$migrateData,$scopeData,$scopeHintData,$factoryData, $colNames)=$this->createData($modelName,$table,$colPrefix,$cols);
+        list($data,$tableName,$migrateData,$scopeData,$scopeHintData,$factoryData, $colNames, $dbStructureJsonForVue, $utilsJsonFileData, $accessorsData, $controllerIndexFilterVariables, $controllerIndexFilterScopes)=$this->createData($modelName,$table,$colPrefix,$cols);
 
-		$this->writeConsts($data,'table');
-		$this->writeMigration($table,$tableName,$migrateData);
-		$this->writeModel($modelName,$scopeData,$scopeHintData);
-		$this->writeFactory($modelName,$factoryData);
-		$this->writeController($withController,$modelName,$colNames);
+        $this->writeConsts($data,'table');
+        $this->writeMigration($table,$tableName,$migrateData);
+        $this->writeModel($modelName,$scopeData,$scopeHintData, $accessorsData);
+        $this->writeFactory($modelName,$factoryData);
+        $this->writeController($withController,$modelName,$colNames, $controllerIndexFilterVariables, $controllerIndexFilterScopes);
+//        $this->writeDbStructureJson($dbStructureJsonForVue);
+        $this->writeUtilsJson($utilsJsonFileData);
+
 
 
 		if($withController){
-			return redirect() -> back() -> with('status', $modelName.' model,consts,migration,controller,route and facrory successfully generated!');
+            return Helper::sucBack($modelName.' model,consts,migration,controller,route and facrory successfully generated!');
 		}else{
-			return redirect() -> back() -> with('status', $modelName.' model,consts,migration and facrory successfully generated!');
+            return Helper::sucBack($modelName.' model,consts,migration and facrory successfully generated!');
 		}
-	}
+    }
 
 
-	// ---------------------------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
 	public function createData($modalName,$table,$colPrefix,$cols) {
-		$cols=explode("\r\n",$cols);
+		$cols=explode("\n",$cols);
+
 
 		$colNames = [];
 		$tableName="TBL_".strtoupper($table);
@@ -84,17 +96,33 @@ class ConstController {
  *
  ';
 
+        $dbStructureJsonForVue = [
+            "name"=> $table,
+            "model_name"=> $modalName,
+            "cols"=>[],
+        ];
+        $utilsJsonFileData = [];
+        $accessorsData = "";
+        $controllerIndexFilterVariables = "";
+        $controllerIndexFilterScopes = "";
+
 		foreach ($cols AS $col){
+
 
 			list($hasScope,$col)=$this->checkHasScope($col);
 
 			list($colType,$col,$enumsArray)=$this->getType($col);
 
+
+
 			$colName='COL_'.strtoupper($colPrefix).'_'.strtoupper($col); // first_name => COL_USER_FIRST_NAME
 			$ucaseCol=str_replace('_', '', ucwords($col, '_')); // first_name =>FistName
 			$camelcaseCol=lcfirst($ucaseCol); // FistName=> fistName
 
-			$colNames[$col] = $colName;
+			$colNames[$col] = [
+                "const"=>$colName,
+                "type"=>$colType,
+            ];
 			$constData.="define('$colName', '".strtolower($col)."');\n";
 			$factoryData .= $this -> generateFactoryRow($colType,$colName,$enumsArray);
 			$migrateData .= $this -> generateMigrationRow($colType,$colPrefix, $colName,$col,$enumsArray);
@@ -102,16 +130,50 @@ class ConstController {
 			if($hasScope){
 				$scopeHintData .= $this -> generateScopeHintRow($modalName, $camelcaseCol);
 				$scopeData .= $this -> generateScopeFunction($ucaseCol, $tableName, $colName);
+                $controllerIndexFilterVariables .= "$".$camelcaseCol."= request('$col');".PHP_EOL;
+                $controllerIndexFilterScopes .= $camelcaseCol."($".$camelcaseCol.")->";
 			}
+
+
+
+            $dbStructureJsonForVue["cols"][] = [
+                "name" => $col,
+                "db_type" => $colType,
+//                "html_type" => $enumsArray != null ? 'select' : $this->getColHTMLType($colType)[0],
+//                "in_index_table" => $enumsArray != null ? 1 : $this->getColHTMLType($colType)[1],
+                "enum_values" => $enumsArray != null ? $enumsArray : '',
+            ];
+
+
+            $utilsJsonFileData = $this->generateEnumsUtilsJsonFileData($utilsJsonFileData, $enumsArray, $modalName, $col);
+
+            $accessorsData = $this->generateAccessorsData($accessorsData, $enumsArray, $modalName, $col, $colName, $colType);
+
 		}
 
 		$scopeHintData.='
 		*/';
 
-		$constData.="\n\n\n\n";
 
-		return array($constData,$tableName,$migrateData,$scopeData,$scopeHintData,$factoryData, $colNames);
-	}
+        $controllerIndexFilterScopes = rtrim($controllerIndexFilterScopes, '->');
+
+
+        //        creating COL_CREATED_AT AND COL_UPDATED_AT
+        $createdAtConstName = "COL_".strtoupper($colPrefix)."_CREATED_AT";
+        $updatedAtConstName = "COL_".strtoupper($colPrefix)."_UPDATED_AT";
+
+        $accessorsData = $this->generateAccessorsData($accessorsData, null, $modalName, "created_at", $createdAtConstName, "datetime");
+        $accessorsData = $this->generateAccessorsData($accessorsData, null, $modalName, "updated_at", $updatedAtConstName, "datetime");
+
+        $constData.="define('$createdAtConstName', 'created_at');\n";
+        $constData.="define('$updatedAtConstName', 'updated_at');\n";
+        //
+
+
+        $constData.="\n\n\n\n";
+
+		return array($constData,$tableName,$migrateData,$scopeData,$scopeHintData,$factoryData, $colNames, $dbStructureJsonForVue, $utilsJsonFileData, $accessorsData, $controllerIndexFilterVariables, $controllerIndexFilterScopes);
+    }
 
 
 	private function checkHasScope($col) {
@@ -128,11 +190,16 @@ class ConstController {
 	private function getType($col) {
 		$colType="";
 		$enumsArray=null;
+
+
+
 		if($col == "id")
 			$colType="id";
 
+
 		elseif(strpos($col,'=')){
-			$colType = substr($col, strpos($col, "=") + 1);
+
+            $colType = substr($col, strpos($col, "=") + 1);
 			$colType=$colType=='int'?'integer':$colType;
 			$colType=$colType=='str'?'string':$colType;
 
@@ -141,17 +208,47 @@ class ConstController {
 				$enumsArray = explode(",", $currentType);
 			}
 
-			if($colType == "")
-				dd("Error : Enter ".$col." Type");
+			if($colType == ""){
+                Helper::errorBack("Error : Enter ".$col." Type");
+            }
 
 			$col = substr($col, 0, strpos($col, "="));
 
 		}else{
-			dd("Error : Enter ".$col." Type");
+            Helper::errorBack("Error : Enter ".$col." Type");
 		}
 
 		return [$colType,$col,$enumsArray];
-	}
+    }
+
+
+    private function getColHTMLType($colType){
+
+        // "db_type" => ["html_type", "should_be_in_index"]
+
+        $htmlTypes = [
+            "id" => ['number', 1],
+            "string" => ['text', 1],
+            "text" => ['textarea', 0],
+            "integer" => ['number', 1],
+            "tinyint" => ['number', 1],
+            "bigint" => ['number', 1],
+            "double" => ['number', 1],
+            "phone" => ['text', 1],
+            "email" => ['email', 1],
+            "username" => ['text', 1],
+            "datetime" => ['date', 0],
+            "password" => ['password', 0],
+            "time" => ['date', 0],
+            "date" => ['date', 0],
+            "bool" => ['checkbox', 1],
+            "file" => ['file', 0],
+            "image" => ['file', 0],
+        ];
+
+        return $htmlTypes[$colType];
+    }
+
 
 	// ---------------------------------------------------------------------------------------------
 	public function generateFactoryRow($colType,$colName,$data=null){
@@ -184,6 +281,9 @@ class ConstController {
 		}
 		elseif($colType == 'datetime' || $colType == 'timestamp'){
 			$value = 'getServerDateTime()';
+		}
+		elseif($colType == 'file' || $colType == 'image'){
+			$value = '$this->faker->text(100)';
 		}
 		elseif($colType == 'password'){
 			$value = 'bcrypt("123456")';
@@ -243,6 +343,9 @@ class ConstController {
 		elseif($colType == 'username'){
 			$value = 'string('.$colName.',150);';
 		}
+		elseif($colType == 'file' || $colType == 'image'){
+			$value = 'string('.$colName.',250)-> nullable();;';
+		}
 		elseif($colType == 'datetime' || $colType == 'timestamp'){
 			$value = 'datetime('.$colName.') -> nullable();';
 		}elseif($colType == 'time'){
@@ -296,16 +399,106 @@ class ConstController {
 	private function generateScopeFunction($ucaseCol, $tableName, $colName) {
 		return '
 	/* @param \Illuminate\Database\Eloquent\Builder $query */
-		public function scope' . $ucaseCol . '($query, $value) {
-			if (ModelEnhanced::checkParameter($value)) {
-				return $query->where(' . $tableName . '.".".' . $colName . ',$value);
-			}
-			return $query;
-		}
+    public function scope' . $ucaseCol . '($query, $value) {
+        if (ModelEnhanced::checkParameter($value)) {
+            return $query->where(' . $tableName . '.".".' . $colName . ',$value);
+        }
+        return $query;
+    }
 
 	';
 	}
-	// ---------------------------------------------------------------------------------------------
+
+
+    // ---------------------------------------------------------------------------------------------
+    private function generateEnumsUtilsJsonFileData($utilsJsonFileData, $enumsArray, $modalName, $col){
+
+        if($enumsArray != null){
+            foreach($enumsArray as $enum){
+                $utilsEnumData[$enum] = $enum;
+            }
+
+            list($singularEnumName, $pluralEnumName) = $this->createEnumNames($modalName, $col);
+
+            $utilsJsonFileData[$pluralEnumName] = $utilsEnumData;
+
+            if(strpos($col, "status") !== false){
+                foreach($enumsArray as $enum){
+                    $utilsEnumData[$enum] = "primary";
+                }
+                $utilsJsonFileData[$singularEnumName."Colors"] = $utilsEnumData;
+            }
+        }
+
+        return $utilsJsonFileData;
+    }
+
+
+    private function createEnumNames($modalName, $col){
+        $sOrEs = 's';
+        if( in_array( substr($col, -1), ["s","z","ch","sh","x"] ) )
+            $sOrEs = "es";
+
+        $enumName = strtolower($modalName).ucfirst($col);
+
+        return [$enumName, $enumName.$sOrEs];
+    }
+
+
+    // ---------------------------------------------------------------------------------------------
+    private function generateAccessorsData($accessorsData, $enumsArray, $modalName, $col, $colName, $colType){
+        $ccColName = ucfirst(\Str::camel($col));
+
+        if(in_array($colType, ["date","datetime"])){
+            $accessorsData .='
+                public function get'.$ccColName.'Attribute($value){
+                    $this->append('.$colName.'."_fa");
+                    return $value;
+                }
+            '.PHP_EOL;
+
+            $accessorsData .='
+                public function get'.$ccColName.'FaAttribute(){
+                    return UC($this->attributes['.$colName.'],U_MILADI_TO_HEJRI);
+                }
+            '.PHP_EOL;
+        }
+        elseif($enumsArray != null){
+            list($singularEnumName, $pluralEnumName) = $this->createEnumNames($modalName, $col);
+
+            $statusColorAppend = "";
+            if(strpos($col, "status") !== false){
+                $statusColorAppend = '$this->append('.$colName.'."_color");';
+            }
+
+            $accessorsData .='
+                public function get'.$ccColName.'Attribute($value){
+                    $this->append('.$colName.'."_text");
+                    '.$statusColorAppend.'
+                    return $value;
+                }
+            '.PHP_EOL;
+
+            $accessorsData .='
+                public function get'.$ccColName.'TextAttribute(){
+                    return UC($this->attributes['.$colName.'], "'.$pluralEnumName.'");
+                }
+            '.PHP_EOL;
+
+            if($statusColorAppend  != ""){
+                $accessorsData .='
+                    public function get'.$ccColName.'ColorAttribute(){
+                        return UC($this->attributes['.$colName.'], "'.$singularEnumName.'Colors");
+                    }
+                '.PHP_EOL;
+            }
+        }
+
+        return $accessorsData;
+    }
+
+
+    // ---------------------------------------------------------------------------------------------
 	public function writeConsts($data, $tableOrEnum='table') {
 
 		$constsPath=self::constsPath;
@@ -322,7 +515,7 @@ class ConstController {
 	}
 
 
-	// ---------------------------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
 	public function writeMigration($table, $tableName, $migrateData) {
 		Artisan::call("make:migration create_".$table."_table --create=".$table);
 
@@ -336,9 +529,11 @@ class ConstController {
 	}
 
 
-	// ---------------------------------------------------------------------------------------------
-	public function writeModel($modalName, $scopeData, $scopeHintData) {
+    // ---------------------------------------------------------------------------------------------
+	public function writeModel($modalName, $scopeData, $scopeHintData, $accessorsData) {
 		Artisan::call("make:model $modalName");
+
+        $scopeData .= $accessorsData;
 
 		$modelPath=self::modelsPath.$modalName.'.php';
 		$modelFileContent=file_get_contents($modelPath);
@@ -353,7 +548,7 @@ class ConstController {
 	}
 
 
-	// ---------------------------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
 	public function writeFactory($modalName, $factoryData) {
 		Artisan::call("make:factory ".$modalName."Factory --model=".$modalName);
 		$factoryPath=self::factoriesPath.$modalName.'Factory.php';
@@ -364,103 +559,113 @@ class ConstController {
 
 
 	// ---------------------------------------------------------------------------------------------
-	public function writeController($withController, $modelName, $colNames) {
+	public function writeController($withController, $modelName, $colNames, $controllerIndexFilterVariables, $controllerIndexFilterScopes) {
 		if ($withController != null) {
 			Artisan::call("make:controller $modelName" . "Controller -r");
 			$controllerName = $modelName . "Controller";
-			$this->fillControllerMethods($modelName, $colNames);
+			$this->fillControllerMethods($modelName, $colNames, $controllerIndexFilterVariables, $controllerIndexFilterScopes);
 			$this->createRoute($modelName, $controllerName);
 		}
 	}
 
 
-	// ---------------------------------------------------------------------------------------------
-	public function fillControllerMethods($modelName,$cols){
-		$controllerPath = self::controllersPath.$modelName.'Controller.php';
-		$content = file_get_contents($controllerPath);
+    // ---------------------------------------------------------------------------------------------
+    public function fillControllerMethods($modelName,$cols, $controllerIndexFilterVariables, $controllerIndexFilterScopes){
+        $controllerPath = self::controllersPath.$modelName.'Controller.php';
+        $content = file_get_contents($controllerPath);
 
-		$colsData = "";
-		foreach($cols as $index => $col){
-			if($index !=  "id")
-				$colsData .= '          $item['.$col.'] = request('.$col.');'."\n";
-		}
+        $colsData = "";
+        $idColConst = "id";
+        foreach($cols as $index => $col){
+            if($index ==  "id")
+                $idColConst = $col["const"];
+            if($index !=  "id"){
+                if(in_array($col["type"], ["file","image","icon"]))
+					$colsData .= '          $item['.$col["const"].'] = \Tools::uploadAndCompressImage(request()->file('.$col["const"].'), PATH_UPLOAD);'."\n";
+				else
+                	$colsData .= '          $item['.$col["const"].'] = request('.$col["const"].');'."\n";
+            }
+        }
 
 
-		// ---------------------------------------------------------- use Model
-		$indexPos = strpos($content,'use Illuminate\Http\Request;');
-		$indexOp = 'use App\Models\\'.$modelName.';';
-		$content = substr_replace($content,$indexOp,$indexPos-1,0);
+        // ---------------------------------------------------------- use Model
+        $indexPos = strpos($content,'use Illuminate\Http\Request;');
+        $indexOp = 'use App\Models\\'.$modelName.';';
+        $content = substr_replace($content,$indexOp,$indexPos-1,0);
 
 
-		// ---------------------------------------------------------- index
-		$indexPos = strpos($content,'index(');
-		$indexOperationPos = strpos($content,'//',$indexPos);
-		$indexOp = '$rowsCount = request("rows_count",10);
+        // ---------------------------------------------------------- index
+        $indexPos = strpos($content,'index(');
+        $indexOperationPos = strpos($content,'//',$indexPos);
+        $indexOp = '$rowsCount = request("rows_count",10);
 		$page = request("page", 1);
+		'.$controllerIndexFilterVariables.'
 
-		$builder = '.$modelName.'::id("");
+
+		$builder = '.$modelName.'::id($id)->'.$controllerIndexFilterScopes.';
 		$count = $builder->count();
-		$items = $builder->orderByDesc(\'id\')->page2($page, $rowsCount)->get();
+		$items = $builder->orderByDesc('.$idColConst.')->page2($page, $rowsCount)->get();
 
 		$pageCount = ceil($count/$rowsCount);
 
 		return generateResponse(RES_SUCCESS,array(\'items\' => $items , \'page_count\' => $pageCount));
         ';
-		$content = substr_replace($content,$indexOp,$indexOperationPos,2);
+        $content = substr_replace($content,$indexOp,$indexOperationPos,2);
 
 
-		// ---------------------------------------------------------- store
-		$storePos = strpos($content,'store(');
-		$storeOperationPos = strpos($content,'//',$storePos);
-		$storeOp = '
+        // ---------------------------------------------------------- store
+        $storePos = strpos($content,'store(');
+        $storeOperationPos = strpos($content,'//',$storePos);
+        $storeOp = '
             $item = new '.$modelName.'();
 '.$colsData.'
             $item -> save();
             return generateResponse(RES_SUCCESS,array(\'item\' => $item));
 
         ';
-		$content = substr_replace($content,$storeOp,$storeOperationPos,2);
+        $content = substr_replace($content,$storeOp,$storeOperationPos,2);
 
 
-		// ------------------------------------------------------------- update
-		$updatePos = strpos($content,'update(');
-		$updateOperationPos = strpos($content,'//',$updatePos);
-		$updateOp = '
+        // ------------------------------------------------------------- update
+        $updatePos = strpos($content,'update(');
+        $updateOperationPos = strpos($content,'//',$updatePos);
+        $updateOp = '
             $item = '.$modelName.'::findOrError($id);
 '.$colsData.'
             $item -> save();
             return generateResponse(RES_SUCCESS,array(\'item\' => $item));
         ';
-		$content = substr_replace($content,$updateOp,$updateOperationPos,2);
+        $content = substr_replace($content,$updateOp,$updateOperationPos,2);
 
 
-		// ------------------------------------------------------------- destroy
-		$destroyPos = strpos($content,'destroy(');
-		$destroyOperationPos = strpos($content,'//',$destroyPos);
-		$destroyOp = '
+        // ------------------------------------------------------------- destroy
+        $destroyPos = strpos($content,'destroy(');
+        $destroyOperationPos = strpos($content,'//',$destroyPos);
+        $destroyOp = '
             $item = '.$modelName.'::findOrError($id);
             $item -> delete();
+            return generateResponse(RES_SUCCESS);
         ';
-		$content = substr_replace($content,$destroyOp,$destroyOperationPos,2);
+        $content = substr_replace($content,$destroyOp,$destroyOperationPos,2);
 
-		// ------------------------------------------------------------- show
-		$showPos = strpos($content,'show(');
-		$showOperationPos = strpos($content,'//',$showPos);
-		$showOp = '
+        // ------------------------------------------------------------- show
+        $showPos = strpos($content,'show(');
+        $showOperationPos = strpos($content,'//',$showPos);
+        $showOp = '
             $item = '.$modelName.'::findOrError($id);
             return generateResponse(RES_SUCCESS,["item"=>$item]);
         ';
-		$content = substr_replace($content,$showOp,$showOperationPos,2);
+        $content = substr_replace($content,$showOp,$showOperationPos,2);
 
 
 		// put content in file
 		file_put_contents($controllerPath,$content);
 
-		return;
-	}
+        return;
+    }
 
 
-	// ---------------------------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
 	public function createRoute($modelName,$controllerName) {
 		$routePath=self::routesPath;
 		$routeData='
@@ -470,7 +675,42 @@ class ConstController {
 	}
 
 
-	// -------------------------------------------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
+	public function writeDbStructureJson($data) {
+        if(sizeof($data) > 0){
+
+            if(file_exists(self::dbStructureJsonFilePath)){
+                $jsonFileContent = json_decode(file_get_contents(self::dbStructureJsonFilePath), true);
+
+                $jsonFileContent["tables"][] = $data;
+            }else{
+                $jsonFileContent["tables"][] = $data;
+            }
+
+            file_put_contents(self::dbStructureJsonFilePath, json_encode($jsonFileContent, JSON_PRETTY_PRINT), FILE_APPEND);
+        }
+	}
+
+
+    // ---------------------------------------------------------------------------------------------
+	public function writeUtilsJson($data) {
+        if(sizeof($data) > 0){
+
+            $jsonFileContent = $data;
+
+            if(file_exists(self::utilsJsonFilePath)){
+                $jsonFileContent = json_decode(file_get_contents(self::utilsJsonFilePath), true);
+
+                $jsonFileContent = array_merge($jsonFileContent, $data);
+            }
+
+
+            file_put_contents(self::utilsJsonFilePath, json_encode($jsonFileContent, JSON_PRETTY_PRINT));
+        }
+	}
+
+
+    // -------------------------------------------------------------------------------------------------------------
 
 	// ----------------------------------------------------------------------------------------------------------------------------------------------
 	// ----------------------------------------------------------------------------------------------------------------------------------------------
@@ -511,7 +751,7 @@ class ConstController {
 			dd("NOT ALLOWED TO REMOVE COLS");
 
 
-		$this->addNewColumn($newCols,$colPrefix, $table, $model,$startColumnsPos,$constsPath);
+		$this->addNewColumn($newCols,$colPrefix, $table, $model,$constsFileContent,$startColumnsPos,$constsPath);
 
 		$this->modifyColumn($modifiedCols,$table,$colPrefix,$model);
 
@@ -532,11 +772,13 @@ class ConstController {
 	private function getColumnPrefix($constsFileContent, $startColumnsPos) {
 
 		$colSample = \substr($constsFileContent, $startColumnsPos+1, strpos($constsFileContent, "\n",$startColumnsPos+1) - $startColumnsPos); // =>  define('COL_BASKET_ID', 'id');
+
 		// extracting the column name and make it upper case : id => ID
 		$colSampleName = substr($colSample, strpos($colSample, ","));
 		$colSampleName = \str_replace([',',"'",")","\n",";"],'',$colSampleName);
 		$colSampleName = strtoupper($colSampleName);
 		$colSampleName = trim($colSampleName);  // => ID
+
 		// extracting something like this : COL_BANK_ID    and turn it to : COL_BANK_   as the prefix
 		$colSamplePrefix = substr($colSample, strpos($colSample, "("),  strpos($colSample, ",") - strpos($colSample, "("));
 		$colSamplePrefix = \str_replace(['(',"'","'",'COL_'],'',$colSamplePrefix);
@@ -720,7 +962,6 @@ class ConstController {
 		$scopeHintData = '';
 		$scopeData = '';
 		$factoryData  = '';
-		$colNames  = [];
 
 
 		foreach ($cols AS $col){
@@ -768,13 +1009,13 @@ class ConstController {
 
 					$currentEnumsArray = explode(",",$currentType);
 
-					$migrationColType = $this -> generateMigrationRow('enum',$colPrefix, $colName,$col,$currentEnumsArray, true);
-					$factoryColValue = $this -> generateFactoryRow('enum',$colName,$currentEnumsArray);
+					$migrationColType = $this -> migrationColType('enum',$colPrefix, $colName,$col,$currentEnumsArray, true);
+					$factoryColValue = $this -> factoryColValue('enum',$currentEnumsArray);
 
 				}
 				else{
-					$migrationColType = $this -> generateMigrationRow($colType,$colPrefix, $colName,$col);
-					$factoryColValue = $this -> generateFactoryRow($colType,$colName);
+					$migrationColType = $this -> migrationColType($colType,$colPrefix, $colName,$col);
+					$factoryColValue = $this -> factoryColValue($colType);
 
 				}
 
@@ -822,12 +1063,11 @@ class ConstController {
 
 
 	// ----------------------------------------------------------------------------------------------------------------
-	public function addNewColumn($newCols,$colSamplePrefix, $table, $model,$pos,$constsPath){
+	public function addNewColumn($newCols,$colSamplePrefix, $table, $model,$constsFileContent,$pos,$constsPath){
 		// creating the new column constant : COL_BANK_NEW
 		list($data,$tableName,$migrateData,$scopeData,$scopeHintData,$factoryData, $colNames) = $this->colsDataCreation($newCols,$colSamplePrefix, $table, $model);
 		$data = trim($data);
 
-		$constsFileContent=file_get_contents($constsPath);
 		$constsFileContent=substr($constsFileContent,0,$pos+1).$data."\n".substr($constsFileContent,$pos+1);
 
 
@@ -879,7 +1119,6 @@ class ConstController {
 		file_put_contents($factoryPath,$factoryFileContent);
 
 
-		// todo
 //		   DB::statement('ALTER TABLE '.$table.' ADD new1 int');
 	}
 
@@ -952,7 +1191,7 @@ class ConstController {
 				}
 
 				file_put_contents($constsPath,$constsFileContent);
-				$enumConsts = $this -> enumConstGenerator($col['enums'],$colSamplePrefix,$col['name'],true);
+				$enumConsts = $this -> enumConstGenerator($col['enums'],$colSamplePrefix,$col['name']);
 
 			}
 
@@ -963,11 +1202,11 @@ class ConstController {
 
 
 		}
-	}
+		}
 
 
 
-	// ---------------------------------------------------------------------------------------
+		// ---------------------------------------------------------------------------------------
 
 	public function casts(){
 		$files = scandir(app_path(self::migrationsPath));

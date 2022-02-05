@@ -13,7 +13,7 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider {
 	{
 		include __DIR__ . '/routes.php';
 
-		$this->loadViewsFrom(__DIR__ . '/Views', 'const');
+		$this->loadViewsFrom(__DIR__ . '/Views', 'builder');
 
 		$this->publishes([
 			__DIR__.'/consts.php' => app_path('Extras/consts.php'),
