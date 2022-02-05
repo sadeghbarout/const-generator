@@ -18,7 +18,7 @@
 
 3- Go to 
 
-        domain.com/const
+        domain.com/builder
         
 4- Add consts file
         
