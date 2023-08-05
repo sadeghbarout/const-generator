@@ -25,7 +25,7 @@ class ConstController {
 
     // ---------------------------------------------------------------------------------------------
     public function column(){
-        $dbName = env('DB_DATABASE');
+        $dbName = config('database.connections.mysql.database');
         $tablesRaw = DB::select('SHOW TABLES');
 
         $tables = [];
