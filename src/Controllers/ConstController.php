@@ -517,15 +517,17 @@ class ConstController {
 
     // ---------------------------------------------------------------------------------------------
 	public function writeMigration($table, $tableName, $migrateData) {
+		$ExistMigrations=scandir(self::migrationsPath);
 		Artisan::call("make:migration create_".$table."_table --create=".$table);
+		$diff=array_diff(scandir(self::migrationsPath),$ExistMigrations);
 
-		$output=Artisan::output();
-		$migrationName=explode(" ",str_replace("\r\n","",$output))[2];
-		$migrationPath=self::migrationsPath.$migrationName.'.php';
+		$migrationName = array_values($diff)[0];
+		$migrationPath=self::migrationsPath.$migrationName;
 		$migrationFileContent=file_get_contents($migrationPath);
 		$migrationFileContent=str_replace("'".strtolower($table)."'",$tableName,$migrationFileContent);
 		$migrationFileContent=str_replace('$table->id();',$migrateData,$migrationFileContent);
 		file_put_contents($migrationPath,$migrationFileContent);
+
 	}
 
 
