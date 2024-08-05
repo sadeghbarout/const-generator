@@ -88,7 +88,7 @@
     </div>
 </div>
 
-<script src="https://unpkg.com/vue@next"></script>
+<script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.25.0/axios.min.js"></script>
 
 <script>
