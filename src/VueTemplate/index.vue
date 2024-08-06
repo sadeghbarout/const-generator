@@ -77,7 +77,7 @@
 
 
             deleteItem(item, index){
-                confirm2('از حذف این آیتم مطمعن هستید؟','حذف',()=>{
+                confirm2('آیا از حذف این آیتم اطمینان دارید؟','حذف',()=>{
                     axios.delete('/#base-url/'+item.id)
                     .then(response=>{
                         checkResponse(response.data, res=>{
