@@ -1,60 +1,74 @@
 <template>
-    <div class="row">
-        <div class="col-md-10 mx-auto">
-            <div class="flex-center-between">
-                <h3>  #page-name </h3>
-                <router-link  :to="'/#base-url/create'" class="btn btn-outline-success "> جدید</router-link>
-            </div>
-            <br>
-            <div class="row d-flex align-items-center">
-                <div class="col-lg-10">
-                    <form @submit.prevent="fetchData(1)">
-                        <div class="row text-center d-flex align-items-center">
-                            #filters
-                            <div class="col-sm-3">
-                                <form-page-rows v-model="pageRows" @input="fetchData(1)"></form-page-rows>
-                            </div>
-                            <div class="col-sm-2">
-                                <button class="btn btn-outline-primary w-100 mt-4">جستجو</button>
-                            </div>
-                        </div>
-                    </form>
+    <div id="data-list-view" class="data-list-view-header">
+
+        <!-- filters -->
+        <form @submit.prevent="page=1;fetchData()">
+            <card-component>
+                #filters
+                <div class="col-sm-3">
+                    <form-inputs type="submit" val="جستجو" customClass="btn btn-outline-primary mt-2"></form-inputs>
                 </div>
-                <div class="col-lg-2">
-                </div>
-            </div>
-            <div class="table-responsive">
-                <table class="table table-striped table-hover">
-                    <thead class="bg-primary">
-                        <tr>
-                            #table-col-names
-                            <th>عملیات</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr v-for="(item, index) in items" :key="item.id">
-                            #table-body-col
-                            <td>
-                                <button @click="deleteItem(item, index)" class="btn btn-danger btn-sm">حذف</button>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-                <pagination :pages="pageCount"  v-model="page" @pageChanged="fetchData()"></pagination>
-            </div>
+            </card-component>
+        </form>
+        <!-- / -->
 
 
+        <!-- title and action -->
+        <div class="d-flex justify-content-between align-items-center">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2 class="content-header-title float-left mb-0"> #page-name  </h2>
+                <router-link :to="'/#base-url/create'" class="btn btn-primary">
+                    <span>
+                        <i class="fas fa-plus"></i> جدید
+                    </span>
+                </router-link>
+            </div>
+            <form-page-rows v-model="pageRows" @input="fetchData(1)"></form-page-rows>
         </div>
+        <!-- / -->
+
+        <!-- table -->
+        <div class="table-responsive" v-if="items.length > 0">
+            <table class="table data-list-view dataTable">
+                <thead>
+                    <tr>
+                        <th>
+                            <check-td :header="true"></check-td>
+                        </th>
+                        #table-col-names
+                        <th>عملیات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr v-for="(item, index) in items" :key="item.id" :id="'row'+item.id">
+                        <td>
+                            <check-td :id="item.id"></check-td>
+                        </td>
+                        #table-body-col
+                        <td>
+                            <button @click="deleteItem(item, index)" class="btn btn-danger btn-sm">حذف</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            <pagination :pages="pageCount" v-model="page" @pageChanged="fetchData()"></pagination>
+        </div>
+
+        <div v-if="items.length == 0" class="alert alert-primary text-center w-100 mt-2">آیتمی یافت نشد</div>
+        <!-- / -->
     </div>
 </template>
 <script>
     export default {
+        mixins:[window.urlMixin],
         data(){
             return {
                 items:[],
                 pageCount:1,
                 page:1,
                 pageRows:10,
+                sort: '',
+                sortType: 'desc',
                 #vue-data
             }
         },
@@ -65,6 +79,8 @@
                         #axios-get-params
                         page:this.page,
                         rows_count:this.pageRows,
+                        sort: this.sort,
+                        sort_type: this.sortType,
                     },
                 })
                 .then(response=>{
@@ -88,7 +104,7 @@
             },
 
         },
-        mounted(){
+        activated(){
             this.fetchData()
 
             #get-enums

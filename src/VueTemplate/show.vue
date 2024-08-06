@@ -49,7 +49,7 @@
 
 
         },
-        mounted(){
+        activated(){
             this.fetchData()
 
             #get-enums

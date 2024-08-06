@@ -1,7 +1,7 @@
 <template>
-    <div class="row">
-        <div class="col-md-5 mx-auto mt-3">
-            <card-component :title=" !id ? '  ثبت رکورد جدید ' : 'ویرایش '  " >
+    <div>
+        <div style="max-width: 600px;" class="mx-auto pt-4">
+            <card-component :title=" !id ? '  ثبت رکورد جدید ' : 'ویرایش '  ">
                 <div class="col-12">
                     <form @submit.prevent="formSubmission()">
 
@@ -12,7 +12,6 @@
                     </form>
                 </div>
             </card-component>
-
         </div>
     </div>
 </template>
@@ -40,17 +39,21 @@
                     axios.post('/#base-url/'+this.item.id,formData,{
                         headers: {'Content-Type': 'multipart/form-data'}
                     })
-                    .then(response=>{
-                        checkResponse(response.data);
-                    })
+                        .then(response => {
+                            checkResponse(response.data, res => {
+                                this.$router.replace({path: '/#base-url'})
+                            } );
+                        })
                 }
                 else{
                     axios.post('/#base-url',formData,{
                         headers: {'Content-Type': 'multipart/form-data'}
                     })
-                    .then(response=>{
-                        checkResponse(response.data);
-                    })
+                        .then(response => {
+                            checkResponse(response.data, res => {
+                                this.$router.replace({path: '/#base-url'})
+                            } );
+                        })
                 }
             },
 
@@ -64,7 +67,7 @@
                 })
             },
         },
-        mounted(){
+        activated(){
             this.id = this.$route.params.id
 
             if(this.id !== '')
