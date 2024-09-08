@@ -69,6 +69,7 @@
                 pageRows:10,
                 sort: '',
                 sortType: 'desc',
+                selectedIds: [],
                 #vue-data
             }
         },
