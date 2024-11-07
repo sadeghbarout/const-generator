@@ -1,6 +1,6 @@
 <template>
     <div class="row">
-        <div class="col-md-6 mx-auto mt-5">
+        <div class="col-12 mx-auto">
 
 
             <card-component title="  مشخصات #detail-card-name  ">
@@ -10,8 +10,11 @@
                     #form-labels
 
                     <br>
-                    <router-link  :to="'/#base-url/create/'+item.id" class="btn btn-warning btn-sm">ویرایش</router-link>
-                    <button  class="btn btn-danger btn-sm float-left" @click="deleteItem()">حذف</button>
+                    <div class="d-flex">
+                        <router-link  :to="'/#base-url/create/'+item.id" class="btn btn-warning btn-sm">ویرایش</router-link>
+                        <div style="padding: 2px;"></div>
+                        <button  class="btn btn-danger btn-sm float-left" @click="deleteItem()">حذف</button>
+                    </div>
                 </div>
             </card-component>
 
