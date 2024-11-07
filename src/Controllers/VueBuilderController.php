@@ -244,13 +244,13 @@ class VueBuilderController{
 
                 if($col["html_type"] == "select"){
                     $filterHtml ="
-                        <div class='col-sm-3'>
+                        <div class='col-lg-3 col-md-6'>
                             <form-select title='".$col['name']."' v-model='".$ccColName."' :options='".$this->getPural($ccColName)."' ></form-select>
                         </div>".PHP_EOL;
                 }
                 else {
                     $filterHtml ="
-                        <div class='col-sm-3'>
+                        <div class='col-lg-3 col-md-6'>
                             <form-inputs title='".$ccColName."' v-model='".$ccColName."' ></form-inputs>
                         </div>".PHP_EOL;
                 }

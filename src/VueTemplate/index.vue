@@ -5,8 +5,8 @@
         <form @submit.prevent="page=1;fetchData()">
             <card-component>
                 #filters
-                <div class="col-sm-3">
-                    <form-inputs type="submit" val="جستجو" customClass="btn btn-outline-primary mt-2"></form-inputs>
+                <div class='col-lg-3 col-md-6 mt-2'>
+                    <button class="btn btn-outline-primary w-100">جستجو</button>
                 </div>
             </card-component>
         </form>
@@ -23,17 +23,17 @@
                     </span>
                 </router-link>
             </div>
-            <form-page-rows v-model="pageRows" @input="fetchData(1)"></form-page-rows>
+            <form-page-rows/>
         </div>
         <!-- / -->
 
         <!-- table -->
         <div class="table-responsive" v-if="items.length > 0">
-            <table class="table data-list-view dataTable">
+            <table class="table data-list-view dataTable px-0">
                 <thead>
                     <tr>
                         <th>
-                            <check-td :header="true"></check-td>
+                            <check-td :header="true"/>
                         </th>
                         #table-col-names
                         <th>عملیات</th>
@@ -42,7 +42,7 @@
                 <tbody>
                     <tr v-for="(item, index) in items" :key="item.id" :id="'row'+item.id">
                         <td>
-                            <check-td :id="item.id"></check-td>
+                            <check-td :id="item.id"/>
                         </td>
                         #table-body-col
                         <td>
@@ -51,7 +51,7 @@
                     </tr>
                 </tbody>
             </table>
-            <pagination :pages="pageCount" v-model="page" @pageChanged="fetchData()"></pagination>
+            <pagination :pages="pageCount" v-model="page" @pageChanged="fetchData()"/>
         </div>
 
         <div v-if="items.length == 0" class="alert alert-primary text-center w-100 mt-2">آیتمی یافت نشد</div>
