@@ -17,13 +17,15 @@
         <div class="d-flex justify-content-between align-items-center">
             <div class="d-flex justify-content-between align-items-center">
                 <h2 class="content-header-title float-left mb-0"> #page-name  </h2>
+            </div>
+            <div class="d-flex" style="gap:8px;">
                 <router-link :to="'/#base-url/create'" class="btn btn-primary">
                     <span>
                         <i class="fas fa-plus"></i> جدید
                     </span>
                 </router-link>
+                <form-page-rows/>
             </div>
-            <form-page-rows/>
         </div>
         <!-- / -->
 
