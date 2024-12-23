@@ -535,16 +535,29 @@ class ConstController {
 	public function writeModel($modalName, $scopeData, $scopeHintData, $accessorsData) {
 		Artisan::call("make:model $modalName");
 
-        $scopeData .= $accessorsData;
+		$relationsAndScopeComment = "
+		//-----------------------------------------------------------------------------------------------------------------------------
+		//-----------------------------------------------------   relations   ---------------------------------------------------------
+		//-----------------------------------------------------------------------------------------------------------------------------
+		
+		//-----------------------------------------------------------------------------------------------------------------------------
+		//-----------------------------------------------    scopes    ----------------------------------------------------------------
+		//-----------------------------------------------------------------------------------------------------------------------------
+		";
+		$mutatorAndAccessorComment = "
+		//-----------------------------------------------------------------------------------------------------------------------------
+		//-----------------------------------------------    mutator & accessor    ----------------------------------------------------
+		//-----------------------------------------------------------------------------------------------------------------------------";
+
+		$scopeData .= $mutatorAndAccessorComment . $accessorsData;
 
 		$modelPath=self::modelsPath.$modalName.'.php';
 		$modelFileContent=file_get_contents($modelPath);
-		$modelFileContent=str_replace('use HasFactory;',$scopeData,$modelFileContent);
-		$modelFileContent=substr_replace($modelFileContent,$scopeHintData,125,0);
-		$modelFileContent=substr_replace($modelFileContent,'use App\Models\ModelEnhanced;',29,0);
+		$modelFileContent = str_replace("extends Model", "extends ModelEnhanced", $modelFileContent);
+		$modelFileContent=str_replace('}',$relationsAndScopeComment . $scopeData.'}',$modelFileContent);
+		$modelFileContent=str_replace('class', $scopeHintData . "\nclass", $modelFileContent);
 
-		$ModelPos=strpos($modelFileContent,'Model',strpos($modelFileContent,'extends'));
-		$modelFileContent=substr_replace($modelFileContent,'ModelEnhanced',$ModelPos,5);
+		$modelFileContent=str_replace('use Illuminate\Database\Eloquent\Model;', "use Illuminate\Database\Eloquent\Factories\HasFactory; \n use App\Models\ModelEnhanced;\n", $modelFileContent);
 
 		file_put_contents($modelPath,$modelFileContent);
 	}
