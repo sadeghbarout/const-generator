@@ -30,8 +30,8 @@
         <!-- / -->
 
         <!-- table -->
-        <div class="table-responsive" v-if="items.length > 0">
-            <table class="table data-list-view dataTable px-0">
+        <div class="table-responsive table-list">
+            <table class="table data-list-view px-0">
                 <thead>
                     <tr>
                         <th>
@@ -53,10 +53,10 @@
                     </tr>
                 </tbody>
             </table>
-            <pagination :pages="pageCount" v-model="page" @pageChanged="fetchData()"/>
+            <div v-if="items.length == 0" class="alert alert-warning text-center w-100 my-2">آیتمی یافت نشد</div>
+            <pagination :pages="pageCount" v-model="page" @pageChanged="fetchData()"></pagination>
         </div>
 
-        <div v-if="items.length == 0" class="alert alert-primary text-center w-100 mt-2">آیتمی یافت نشد</div>
         <!-- / -->
     </div>
 </template>

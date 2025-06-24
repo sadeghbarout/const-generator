@@ -3,6 +3,7 @@ namespace Colbeh\Consts\Controllers;
 
 
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Colbeh\Consts\Helper;
@@ -614,16 +615,21 @@ class ConstController {
         $indexOperationPos = strpos($content,'//',$indexPos);
         $indexOp = '$rowsCount = request("rows_count",10);
 		$page = request("page", 1);
+		$filters = request("filters", []);
+		$sort = request("sort");
+		
 		'.$controllerIndexFilterVariables.'
 
 
-		$builder = '.$modelName.'::id($id)->'.$controllerIndexFilterScopes.';
+		$builder = '.$modelName.'::sort($sort)->filters($filters)->'.$controllerIndexFilterScopes.';
 		$count = $builder->count();
-		$items = $builder->orderByDesc('.$idColConst.')->page2($page, $rowsCount)->get();
+		$items = $builder->page2($page, $rowsCount)->get();
 
 		$pageCount = ceil($count/$rowsCount);
+		
+		$selectedColumns=auth()->user()->getSelectedColumns("'. strtolower($modelName) .'");
 
-		return generateResponse(RES_SUCCESS,array(\'items\' => $items , \'page_count\' => $pageCount));
+		return generateResponse(RES_SUCCESS,array(\'items\' => $items , RK_SELECTED_COLUMNS => $selectedColumns, \'page_count\' => $pageCount));
         ';
         $content = substr_replace($content,$indexOp,$indexOperationPos,2);
 

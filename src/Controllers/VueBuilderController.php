@@ -135,6 +135,8 @@ class VueBuilderController{
         if(!file_exists($putBasePath.$folderName ))
             \mkdir($putBasePath.$folderName);
 
+		$this->createListColumns();
+
         if($table["index"] == 1)
             $this->createIndexPage($table, $getBasePath, $putBasePath);
 
@@ -150,6 +152,11 @@ class VueBuilderController{
         return Helper::sucBack('Vue files created');
     }
 
+
+    // =========================================================================================================================
+	public function createListColumns() {
+
+	}
 
     // =========================================================================================================================
     private function createIndexPage($table, $getBasePath, $putBasePath){
