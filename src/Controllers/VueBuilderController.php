@@ -135,7 +135,7 @@ class VueBuilderController{
         if(!file_exists($putBasePath.$folderName ))
             \mkdir($putBasePath.$folderName);
 
-		$this->createListColumns();
+		$this->createListColumns($table);
 
         if($table["index"] == 1)
             $this->createIndexPage($table, $getBasePath, $putBasePath);
@@ -154,8 +154,31 @@ class VueBuilderController{
 
 
     // =========================================================================================================================
-	public function createListColumns() {
+	public function createListColumns($table) {
+		$listColumn = [];
 
+		foreach ($table['cols'] as $index => $col){
+			$listColumn [] = [
+				"id" => $col['name'],
+                "label" => $col['name'],
+                "val" => $col['name'],
+                "def" => $col['name'] === 'id' || $col['in_index_table'] === 1 ? 1 : 0,
+				"sortable" => 1,
+				"filterType" => "text",
+			];
+
+			if($col['html_type'] === "date"){
+				$listColumn[$index]["filterType"] = 'date';
+			}
+		}
+
+		$listColumnsPath = resource_path('files/list-columns.json');
+
+		$keyName = strtolower($table['model_name']);
+		$data = json_decode(file_get_contents($listColumnsPath), true);
+		$data[$keyName]['list'] = $listColumn;
+
+		file_put_contents($listColumnsPath, json_encode($data, JSON_PRETTY_PRINT));
 	}
 
     // =========================================================================================================================
