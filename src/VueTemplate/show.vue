@@ -44,7 +44,9 @@
                 confirm2('از حذف این آیتم اطمینان دارید؟','حذف',()=>{
                     axios.delete('/#base-url/'+this.$route.params.id)
                     .then(response=>{
-                        checkResponse(response.data)
+                        checkResponse(response.data,response=>{
+                            this.$router.replace({path: '/#base-url'});
+                        },true)
                     })
                 })
             },

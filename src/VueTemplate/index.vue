@@ -3,7 +3,7 @@
 
         <!-- filters -->
         <form @submit.prevent="page=1;fetchData()">
-            <card-component>
+            <card-component toggle>
                 #filters
                 <div class='col-lg-3 col-md-6 mt-2'>
                     <button class="btn btn-outline-primary w-100">جستجو</button>
@@ -99,7 +99,7 @@
                         rows_count:this.pageRows,
                         sort: this.sort,
                         filters: this.filtersItems,
-                        export: this.excelExport,
+                        export: excelExport,
                     },
                 })
                 .then(response=>{

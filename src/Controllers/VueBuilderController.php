@@ -169,6 +169,7 @@ class VueBuilderController{
 
 			if($col['html_type'] === "date"){
 				$listColumn[$index]["filterType"] = 'date';
+				$listColumn[$index]["val"] = $col['name'] . '_fa';
 			}
 		}
 
@@ -176,6 +177,7 @@ class VueBuilderController{
 
 		$keyName = strtolower($table['model_name']);
 		$data = json_decode(file_get_contents($listColumnsPath), true);
+		$data[$keyName]['filtersIsActive'] = true;
 		$data[$keyName]['list'] = $listColumn;
 
 		file_put_contents($listColumnsPath, json_encode($data, JSON_PRETTY_PRINT));
