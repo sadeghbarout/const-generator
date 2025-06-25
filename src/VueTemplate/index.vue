@@ -18,7 +18,11 @@
             <div class="d-flex justify-content-between align-items-center">
                 <h2 class="content-header-title float-left mb-0"> #page-name  </h2>
             </div>
-            <div class="d-flex" style="gap:8px;">
+            <div class="d-flex align-items-center" style="gap:8px;">
+<!--                <excel-export-button @on-export="fetchData" :loading="isFetchingData"/>-->
+
+                <custom-column-dialog type="#base-url" v-model="selectedColumnsData" :selectedColumnIds="selectedColumnIds"/>
+
                 <router-link :to="'/#base-url/create'" class="btn btn-primary">
                     <span>
                         <i class="fas fa-plus"></i> جدید
@@ -37,7 +41,9 @@
                         <th>
                             <check-td :header="true"/>
                         </th>
-                        #table-col-names
+
+                        <custom-column-th :selectedColumnsData="selectedColumnsData" :filters="filtersItems" :sortOptions="sort"/>
+
                         <th>عملیات</th>
                     </tr>
                 </thead>
@@ -46,7 +52,9 @@
                         <td>
                             <check-td :id="item.id"/>
                         </td>
-                        #table-body-col
+
+                        <custom-column-td :selectedColumnsData="selectedColumnsData" :to='"/#base-url/"+item.id' :item="item" ></custom-column-td>
+
                         <td>
                             <button @click="deleteItem(item, index)" class="btn btn-danger btn-sm">حذف</button>
                         </td>
@@ -69,28 +77,48 @@
                 pageCount:1,
                 page:1,
                 pageRows:10,
-                sort: '',
-                sortType: 'desc',
                 selectedIds: [],
+
+                selectedColumnIds: [],
+                selectedColumnsData: [],
+                filtersItems: [],
+                sort: {},
+                isFetchingData: false,
+
                 #vue-data
             }
         },
         methods: {
-            fetchData(){
+            fetchData(excelExport = 0) {
+                this.isFetchingData = true
+
                 axios.get('/#base-url',{
                     params:{
                         #axios-get-params
                         page:this.page,
                         rows_count:this.pageRows,
                         sort: this.sort,
-                        sort_type: this.sortType,
+                        filters: this.filtersItems,
+                        export: this.excelExport,
                     },
                 })
                 .then(response=>{
                     checkResponse(response.data,response=>{
+                        this.isFetchingData = false
+
+                        if(excelExport===1){
+                            window.location.replace(response.link)
+                            return;
+                        }
+
                         this.items = response.items
                         this.pageCount = response.page_count;
+                        this.selectedColumnIds = response.selected_columns;
+                        this.selectedColumnsData=Tools.getSelectedColumnsData('#base-url',this.selectedColumnIds);
                     },true)
+                })
+                .catch(() => {
+                    this.isFetchingData = false
                 })
             },
 

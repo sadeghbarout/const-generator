@@ -199,6 +199,7 @@ class VueBuilderController{
 
         $indexTemplate = str_replace("#base-url", strtolower($table["model_name"]), $indexTemplate);
 
+
         $indexTemplate = $this->createGetEnums($table, $indexTemplate);
 
         $indexTemplate = $this->createFilters($table, $indexTemplate);

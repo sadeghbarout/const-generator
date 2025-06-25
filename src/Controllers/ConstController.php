@@ -617,6 +617,7 @@ class ConstController {
 		$page = request("page", 1);
 		$filters = request("filters", []);
 		$sort = request("sort");
+		$export = request("export");
 		
 		'.$controllerIndexFilterVariables.'
 
