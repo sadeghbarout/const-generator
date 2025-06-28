@@ -175,7 +175,7 @@ class VueBuilderController{
 
 		$listColumnsPath = resource_path('files/list-columns.json');
 
-		$keyName = strtolower($table['model_name']);
+		$keyName = \Str::camel($table['model_name']);
 		$data = json_decode(file_get_contents($listColumnsPath), true);
 		$data[$keyName]['filtersIsActive'] = true;
 		$data[$keyName]['list'] = $listColumn;
@@ -199,8 +199,7 @@ class VueBuilderController{
 
         $indexTemplate = str_replace("#page-name", $table["name"], $indexTemplate);
 
-        $indexTemplate = str_replace("#base-url", strtolower($table["model_name"]), $indexTemplate);
-
+        $indexTemplate = str_replace("#base-url", \Str::camel($table["model_name"]), $indexTemplate);
 
         $indexTemplate = $this->createGetEnums($table, $indexTemplate);
 
@@ -343,6 +342,7 @@ class VueBuilderController{
     // =========================================================================================================================
     private function createVueData($table, $template, $templateNmae="index"){
         $data = "";
+		$outVars = "";
 
         foreach($table["cols"] as $col){
             if($templateNmae == "index" && $col["in_index_table"] != 1)
@@ -351,11 +351,12 @@ class VueBuilderController{
             if(in_array($col['name'], ["created_at","updated_at"]))
                 continue;
 
-            $ccColName = \Str::camel($col['name']);
+            $ccColName = \Str::snake($col['name']);
+			$outVar = '';
 
             if($col["html_type"] == "select"){
                 $html = $ccColName ." : '', ".PHP_EOL;
-                $html .= $this->getPural($ccColName)." : [], ".PHP_EOL;
+				$outVar .= $this->getPural($ccColName)." : [], ".PHP_EOL;
             } else {
 
                 if($templateNmae == "show")
@@ -365,9 +366,12 @@ class VueBuilderController{
             }
 
             $data .= $html;
+			$outVars .= $outVar;
         }
 
+
         $template = str_replace("#vue-data", $data, $template);
+        $template = str_replace("#out-vars", $outVars, $template);
 
         return $template;
     }
@@ -409,7 +413,7 @@ class VueBuilderController{
 
         $template = str_replace("#detail-card-name", $table["model_name"], $template);
 
-        $template = str_replace("#base-url", strtolower($table["model_name"]), $template);
+        $template = str_replace("#base-url", \Str::camel($table["model_name"]), $template);
 
 
         $template = $this->createGetEnums($table, $template, "show");
@@ -477,7 +481,7 @@ class VueBuilderController{
 
         $template = file_get_contents( $getBasePath."create.vue"  );
 
-        $template = str_replace("#base-url", strtolower($table["model_name"]), $template);
+        $template = str_replace("#base-url", \Str::camel($table["model_name"]), $template);
 
         $template = $this->createVueData($table, $template, "create");
 
@@ -497,14 +501,14 @@ class VueBuilderController{
         foreach($table["cols"] as $col){
 
             $colName = $col['name'];
-            $ccColName = \Str::camel($colName);
+            $ccColName = \Str::snake($colName);
             $colHtmlType = $col["html_type"];
 
             if(in_array($colName, ["id","created_at","updated_at"]))
                 continue;
 
             if($colHtmlType == "select"){
-                $html ="<form-select title='$colName' v-model='item.$ccColName' :options='".$ccColName."s' ></form-select>".PHP_EOL;
+                $html ="<form-select title='$colName' v-model='item.$ccColName' :options='".\Str::plural(\Str::camel($ccColName))."' ></form-select>".PHP_EOL;
             }
             else if($colHtmlType == "file"){
                 $html ="<form-uploader title='$colName' v-model='item.$ccColName'  ></form-uploader>".PHP_EOL;

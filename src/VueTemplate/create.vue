@@ -23,6 +23,8 @@
                     #vue-data
                 },
                 id : '',
+
+                #out-vars
             }
         },
         methods: {
