@@ -351,7 +351,7 @@ class VueBuilderController{
             if(in_array($col['name'], ["created_at","updated_at"]))
                 continue;
 
-            $ccColName = \Str::snake($col['name']);
+            $ccColName = $templateNmae === "index"? \Str::camel($col['name']) : \Str::snake($col['name']);
 			$outVar = '';
 
             if($col["html_type"] == "select"){

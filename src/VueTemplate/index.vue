@@ -86,6 +86,7 @@
                 isFetchingData: false,
 
                 #vue-data
+                #out-vars
             }
         },
         methods: {
